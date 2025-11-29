@@ -1,2 +1,10 @@
-body { display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; background: #f44336; color: white; text-align: center; }
+body { 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  height: 100vh; 
+  font-family: sans-serif; 
+  background: #f44336;
+  color: white; 
+  text-align: center; }
 h1 { font-size: 2em; }
