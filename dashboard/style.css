@@ -1,0 +1,17 @@
+body { 
+  font-family: sans-serif; 
+  padding: 10px; 
+}
+h1 { margin-bottom: 10px; }
+button { margin: 5px 0; padding: 5px 10px; }
+ul { list-style: none; padding: 0; }
+li { margin-bottom: 5px; display: flex; align-items: center; gap: 5px; }
+input[type="text"], input[type="number"] { 
+  width: 100px; 
+  border: 2px solid green; /* default = saved */
+}
+input:focus {
+  border-color: red; /* editing */
+  outline: none;     /* optional: remove default outline */
+}
+select { margin-top: 10px; }
