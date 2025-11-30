@@ -4,22 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Limitless | Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="../styles.css">
   </head>
   <body>
-    <h1>Limitless</h1>
-    <input type="text" id="domain-entry" placeholder="example.com">
-    <button id="add-site">Add New Website</button>
+    <div class="dashboard-wrap">
+      <h2>Limitless</h2>
 
-    <ul id="site-list"></ul>
+      <div class="add-new-wrap">
+        <input type="text" id="domain-entry" placeholder="example.com">
+        <button id="add-site" class="add-new" disabled>Add New Website</button>
+      </div>
 
-    <label for="peek-time">Sneak Peek Duration:</label>
-    <select id="peek-time">
-      <option value="0.25">15s</option>
-      <option value="0.5">30s</option>
-      <option value="1">1min</option>
-      <option value="2">2min</option>
-    </select>
+      <ul id="site-list"></ul>
+
+      <div class="peek-wrap">
+        <label for="peek-time">Sneak Peek Duration:</label>
+        <select id="peek-time">
+          <option value="0.25">15 sec</option>
+          <option value="0.5">30 sec</option>
+          <option value="1">1 min</option>
+          <option value="2">2 min</option>
+        </select>
+      </div>
+    </div>
 
     <script src="main.js"></script>
   </body>

@@ -46,23 +46,23 @@ function updateBadge(tabId, url) {
     const site = websites.find(w => w.domain === domain);
     if (!site) {
       chrome.action.setBadgeText({ text: "" });
-      chrome.action.setBadgeBackgroundColor({ color: "#008000" });
+      chrome.action.setBadgeBackgroundColor({ color: "#6AFDFF" });
       return;
     }
 
     const timeLeft = calculateTimeLeft(site);
     let text = "";
-    let color = "#008000";
+    let color = "#6AFDFF";
 
     if (timeLeft > 1) {
         text = Math.floor(timeLeft) + "m";
-        if (timeLeft <= 15) color = "#FFA500";
+        if (timeLeft <= 15) color = "#FFC66B";
     } else if (timeLeft > 0) {
         text = "<1m";
-        color = "#ff5100";
+        color = "#FF6B6B";
     } else {
         text = "0m";
-        color = "#FF0000";
+        color = "#1D1D1D";
     }
 
     chrome.action.setBadgeText({ text });
@@ -151,7 +151,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // Periodic badge updates for active tab
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("updateBadge", { periodInMinutes: 5 / 60 });
-  chrome.action.setBadgeBackgroundColor({ color: "#008000" });
+  chrome.action.setBadgeBackgroundColor({ color: "#6AFDFF" });
   chrome.action.setBadgeText({ text: "" });
 });
 

@@ -48,7 +48,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const li = document.createElement("li");
         const domainSpan = document.createElement("span");
         domainSpan.textContent = site.domain;
+        domainSpan.classList.add("site-name");
         const timeSelect = document.createElement("select");
+        timeSelect.id = "time-select" + index;
 
         for (let i = 0; i <= 180; i += 5) { // Add timer options, 0 to 180 minutes
           const option = document.createElement("option");
@@ -60,15 +62,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const peekCheckbox = document.createElement("input");
         peekCheckbox.type = "checkbox";
+        peekCheckbox.id = "peek-check" + index;
         peekCheckbox.checked = !!site.peekMode;
 
         const deleteBtn = document.createElement("button");
         deleteBtn.textContent = "Delete";
-        deleteBtn.classList.add("delete-btn");
+        deleteBtn.classList.add("delete");
         deleteBtn.dataset.index = String(index);
 
         const timeLeftSpan = document.createElement("span");
         timeLeftSpan.dataset.index = String(index);
+        timeLeftSpan.classList.add("time-left");
 
         li.append(domainSpan, timeSelect, peekCheckbox, timeLeftSpan, deleteBtn);
         siteList.appendChild(li);
@@ -92,6 +96,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         deleteBtn.addEventListener("click", () => {
+          const confirmed = confirm(`Are you sure you want to delete the time limit for ${site.domain}?`);
+          if (!confirmed) return; // user canceled
           websites.splice(index, 1);
           saveWebsites();
           renderSites();
@@ -99,6 +105,17 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
+    // input listeners
+    newDomainInput.addEventListener("input", () => {
+      addNewButton.disabled = newDomainInput.value.trim() === "";
+    })
+    newDomainInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && addNewButton.disabled === false) {
+        addNewButton.click();
+      }
+    });
+
+    // add new button
     addNewButton.addEventListener("click", () => {
       const rawInput = newDomainInput.value.toLowerCase().trim(); // remove whitespace
       if (!rawInput) return;
@@ -116,6 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
       saveWebsites();
       renderSites();
       newDomainInput.value = "";
+      addNewButton.disabled = true;
     });
 
     peekSelect.addEventListener("change", () => {

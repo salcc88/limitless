@@ -1,0 +1,192 @@
+@font-face {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  src: url(/assets/font/plus-jakarta-sans-600.woff2) format("woff2");
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-style: normal;
+}
+
+:root {
+  color-scheme: light dark;
+
+  --blue: #6AFDFF;
+  --dk-blue: #448D8E;
+  --orange: #FFC66B;
+  --red: #FF6B6B;
+  --gray: #1D1D1D;
+  --white: #FFFFFF;
+}
+
+/* global styles */
+
+html {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  margin: 0;
+  padding: 0;
+}
+body {
+  padding: 0;
+  margin: 0;
+}
+
+h1, h2, h3 { 
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  margin: 0;
+}
+h1 {
+  font-size: 4rem;
+}
+h2 { 
+  font-size: 2rem;
+}
+h3 { 
+  font-size: 1.2rem;
+}
+
+span, label {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+button { 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0px 16px;
+  border-radius: 16px;
+  border: none;
+  cursor: pointer;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  background-color: var(--blue);
+}
+button.add-new {
+  height: 28px;
+}
+button.delete {
+  background-color: var(--red);
+  color: var(--white);
+}
+button:hover, button:focus-visible {
+  background-color: var(--orange);
+}
+button:disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+input[type="text"] { /* new website input box */
+  height: 28px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  width: 200px;
+  padding: 0 0.5rem 0 1rem;
+  border: none;
+  border-radius: 16px;
+}
+input[type="text"]:focus {
+  outline: none;
+}
+
+input[type="checkbox"] { /* need hack */
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--dk-blue);
+  background-color: red;
+  cursor: pointer;
+}
+
+ul { 
+  list-style: none; 
+  padding: 0; 
+  margin: 0;
+}
+
+/*************************/
+/*   Dashboard Styles    */
+/*************************/
+.dashboard-wrap {
+  width: 50%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.add-new-wrap {
+  display: flex;
+  align-items: center;
+  border: 2px var(--dk-blue) solid;
+  border-radius: 20px;
+  height: 32px;
+  box-sizing: border-box;
+}
+
+.dashboard-wrap ul {
+  width: 100%;
+}
+.dashboard-wrap li {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  width: 100%;
+}
+span.site-name {
+  width: 30%;
+  font-size: 1rem;
+}
+span.time-left {
+  width: 20%;
+  opacity: 0.5;
+}
+
+select { /* time limit selector */
+  height: 32px;
+  border-radius: 16px;
+  border: 2px solid var(--dk-blue);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  width: 100px;
+  padding-left: 0.5rem;
+  cursor: pointer;
+}
+
+/*************************/
+/* Blocked Screen Styles */
+/*************************/
+
+.blocked-wrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: center; 
+  align-items: center; 
+  height: 100vh; 
+  font-family: 'Plus Jakarta Sans', sans-serif; 
+  background: var(--blue);
+  text-align: center; 
+  /* color: var(--blue); */
+}
+
+/*************************/
+/*     Popup Styles      */
+/*************************/
+.popup-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  width: 180px;
+}
+.popup-wrap li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
