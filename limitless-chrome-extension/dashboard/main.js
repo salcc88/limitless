@@ -96,7 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         deleteBtn.addEventListener("click", () => {
-          const confirmed = confirm(`Are you sure you want to delete the time limit for ${site.domain}?`);
+          const confirmed = confirm(`Are you sure you want to remove the limit for ${site.domain}?`);
           if (!confirmed) return; // user canceled
           websites.splice(index, 1);
           saveWebsites();

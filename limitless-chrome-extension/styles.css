@@ -1,19 +1,20 @@
 @font-face {
   font-family: "Plus Jakarta Sans", sans-serif;
-  src: url(/assets/font/plus-jakarta-sans-600.woff2) format("woff2");
+  src: url(/assets/font/plus-jakarta-sans-500.woff2) format("woff2");
   font-optical-sizing: auto;
-  font-weight: 600;
+  font-weight: 500;
   font-style: normal;
 }
 
 :root {
   color-scheme: light dark;
 
-  --blue: #6AFDFF;
-  --dk-blue: #448D8E;
+  --blue: #3BC4AB;
+  --blue-highlight: #43dabe;
   --orange: #FFC66B;
   --red: #FF6B6B;
   --gray: #1D1D1D;
+  --light-gray: #999999;
   --white: #FFFFFF;
 }
 
@@ -21,7 +22,7 @@
 
 html {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 600;
+  font-weight: 500;
   margin: 0;
   padding: 0;
 }
@@ -32,8 +33,9 @@ body {
 
 h1, h2, h3 { 
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 600;
+  font-weight: 500;
   margin: 0;
+  color: var(--gray);
 }
 h1 {
   font-size: 4rem;
@@ -47,8 +49,9 @@ h3 {
 
 span, label {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.8rem;
+  color: var(--gray);
 }
 
 button { 
@@ -56,49 +59,54 @@ button {
   align-items: center;
   justify-content: center;
   height: 32px;
-  padding: 0px 16px;
-  border-radius: 16px;
+  padding: 0px 12px;
+  border-radius: 8px;
   border: none;
   cursor: pointer;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 1rem;
   background-color: var(--blue);
-}
-button.add-new {
-  height: 28px;
+  color: var(--white);
+  transition: background-color 200ms;
 }
 button.delete {
   background-color: var(--red);
-  color: var(--white);
 }
 button:hover, button:focus-visible {
-  background-color: var(--orange);
+  background-color: var(--blue-highlight);
 }
 button:disabled {
   pointer-events: none;
-  opacity: 0.6;
 }
 
 input[type="text"] { /* new website input box */
   height: 28px;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 1rem;
   width: 200px;
-  padding: 0 0.5rem 0 1rem;
-  border: none;
-  border-radius: 16px;
+  padding: 0 0.5rem;
+  border: 1px solid var(--light-gray);
+  border-radius: 8px;
+  background-color: var(--white);
+  color: var(--gray);
 }
-input[type="text"]:focus {
+input[type="text"]::placeholder {
+  color: var(--light-gray);
+}
+
+input:focus,
+input:focus-visible,
+select:focus,
+select:focus-visible {
   outline: none;
+  border: 1px solid var(--blue);
 }
 
 input[type="checkbox"] { /* need hack */
   width: 16px;
   height: 16px;
-  border: 2px solid var(--dk-blue);
-  background-color: red;
   cursor: pointer;
 }
 
@@ -113,19 +121,20 @@ ul {
 /*************************/
 .dashboard-wrap {
   width: 50%;
-  margin: 0 auto;
+  margin: 5% auto;
+  padding: 2rem;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.5rem;
+  background-color: var(--white);
+  border-radius: 32px;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
 }
 .add-new-wrap {
   display: flex;
   align-items: center;
-  border: 2px var(--dk-blue) solid;
-  border-radius: 20px;
-  height: 32px;
-  box-sizing: border-box;
+  gap: 0.5rem;
 }
 
 .dashboard-wrap ul {
@@ -144,19 +153,21 @@ span.site-name {
 }
 span.time-left {
   width: 20%;
-  opacity: 0.5;
+  color: var(--light-gray);
 }
 
 select { /* time limit selector */
   height: 32px;
-  border-radius: 16px;
-  border: 2px solid var(--dk-blue);
+  border-radius: 8px;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 1rem;
   width: 100px;
   padding-left: 0.5rem;
   cursor: pointer;
+  border: 1px solid var(--light-gray);
+  background-color: var(--white);
+  color: var(--gray);
 }
 
 /*************************/
@@ -171,22 +182,27 @@ select { /* time limit selector */
   height: 100vh; 
   font-family: 'Plus Jakarta Sans', sans-serif; 
   background: var(--blue);
-  text-align: center; 
-  /* color: var(--blue); */
+  text-align: center;
+}
+.blocked-wrap h1, .blocked-wrap h2 {
+  color: var(--white);
 }
 
 /*************************/
 /*     Popup Styles      */
 /*************************/
+
 .popup-wrap {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   padding: 1rem;
   width: 180px;
+  background-color: var(--white);
 }
 .popup-wrap li {
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
+  color: var(--light-gray);
 }

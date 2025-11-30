@@ -5,6 +5,11 @@ const activeTabTimes = {}; // last timestamp per active tab
 const tabVisibility = {}; // visibility state per tabId
 const peekStartTimes = {}; // key: tabId, value: timestamp when peek started
 
+const blueColor = rootStyles.getPropertyValue('--blue').trim();
+const orangeColor = rootStyles.getPropertyValue('--orange').trim();
+const redColor = rootStyles.getPropertyValue('--red').trim();
+const grayColor = rootStyles.getPropertyValue('--gray').trim();
+
 // Calculate remaining time
 function calculateTimeLeft(site) {
   if (!site) return 0;
@@ -46,23 +51,23 @@ function updateBadge(tabId, url) {
     const site = websites.find(w => w.domain === domain);
     if (!site) {
       chrome.action.setBadgeText({ text: "" });
-      chrome.action.setBadgeBackgroundColor({ color: "#6AFDFF" });
+      chrome.action.setBadgeBackgroundColor({ color: blueColor });
       return;
     }
 
     const timeLeft = calculateTimeLeft(site);
     let text = "";
-    let color = "#6AFDFF";
+    let color = blueColor;
 
     if (timeLeft > 1) {
         text = Math.floor(timeLeft) + "m";
-        if (timeLeft <= 15) color = "#FFC66B";
+        if (timeLeft <= 15) color = orangeColor;
     } else if (timeLeft > 0) {
         text = "<1m";
-        color = "#FF6B6B";
+        color = redColor;
     } else {
         text = "0m";
-        color = "#1D1D1D";
+        color = grayColor;
     }
 
     chrome.action.setBadgeText({ text });
@@ -106,6 +111,38 @@ function checkAndBlock(tabId, url) {
   });
 }
 
+// --- DAILY RESET FUNCTIONALITY ---
+function resetDailyUsage() {
+  const today = new Date().toDateString();
+  chrome.storage.local.get(["lastReset", "websites"], (data) => {
+    if (data.lastReset !== today) {
+      const websites = data.websites || [];
+      const resetWebsites = websites.map(site => ({ ...site, usage: 0 }));
+      chrome.storage.local.set({
+        websites: resetWebsites,
+        lastReset: today
+      }, () => {
+        // Refresh badge for active tab if necessary
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0] && tabs[0].url) {
+            updateBadge(tabs[0].id, tabs[0].url);
+          }
+        });
+      });
+    }
+  });
+}
+
+// Schedule next midnight alarm
+function scheduleMidnightReset() {
+  const now = new Date();
+  const nextMidnight = new Date();
+  nextMidnight.setHours(24,0,0,0); // next calendar day midnight
+  const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+
+  chrome.alarms.create("midnightReset", { when: Date.now() + msUntilMidnight });
+}
+
 // Listeners for immediate updates
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
@@ -146,13 +183,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     });
     return true;
   }
+  return false;
 });
 
 // Periodic badge updates for active tab
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("updateBadge", { periodInMinutes: 5 / 60 });
-  chrome.action.setBadgeBackgroundColor({ color: "#6AFDFF" });
+  chrome.action.setBadgeBackgroundColor({ color: blueColor });
   chrome.action.setBadgeText({ text: "" });
+
+  const today = new Date().toDateString(); // Initialize lastReset date
+  chrome.storage.local.get(["lastReset"], (data) => {
+    if (!data.lastReset) {
+      chrome.storage.local.set({ lastReset: today });
+    }
+  });
+
+  scheduleMidnightReset(); // schedule next reset
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  resetDailyUsage(); // reset on browser startup
+  scheduleMidnightReset(); // schedule next reset
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -166,5 +218,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       updateBadge(tabId, url);
       checkAndBlock(tabId, url);
     });
+  } else if (alarm.name === "midnightReset") {
+    resetDailyUsage();
+    scheduleMidnightReset(); // schedule for the next midnight
   }
 });
