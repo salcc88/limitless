@@ -3,6 +3,7 @@
 // In-memory maps
 const activeTabTimes = {}; // last timestamp per active tab
 const tabVisibility = {}; // visibility state per tabId
+const peekStartTimes = {}; // key: tabId, value: timestamp when peek started
 
 // Calculate remaining time
 function calculateTimeLeft(site) {
@@ -20,7 +21,8 @@ async function trackUsage(tabId, url) {
 
     const domain = new URL(url).hostname.replace("www.", "");
     chrome.storage.local.get(["websites"], (data) => {
-      const site = data.websites.find(w => w.domain === domain);
+      let websites = data.websites || [];
+      const site = websites.find(w => w.domain === domain);
       if (!site) return;
 
       const now = Date.now();
@@ -40,7 +42,8 @@ async function trackUsage(tabId, url) {
 function updateBadge(tabId, url) {
   const domain = new URL(url).hostname.replace("www.", "");
   chrome.storage.local.get(["websites"], (data) => {
-    const site = data.websites?.find(w => w.domain === domain);
+    let websites = data.websites || [];
+    const site = websites.find(w => w.domain === domain);
     if (!site) {
       chrome.action.setBadgeText({ text: "" });
       chrome.action.setBadgeBackgroundColor({ color: "#008000" });
@@ -70,11 +73,32 @@ function updateBadge(tabId, url) {
 // Block a website if limit reached
 function checkAndBlock(tabId, url) {
   const domain = new URL(url).hostname.replace("www.", "");
-  chrome.storage.local.get(["websites"], (data) => {
-    const site = data.websites.find(w => w.domain === domain);
+  chrome.storage.local.get(["websites", "peekDuration"], (data) => {
+    let websites = data.websites || [];
+    const site = websites.find(w => w.domain === domain);
     if (!site) return;
 
-    if (calculateTimeLeft(site) <= 0) {
+    const timeLeft = calculateTimeLeft(site);
+    const peekDuration = data.peekDuration || 0.25; // minutes
+
+    if (timeLeft > 0) {
+      return;
+    }
+
+    if (site.peekMode) { // peek mode delay before block
+      const now = Date.now();
+      if (!peekStartTimes[tabId]) {
+        peekStartTimes[tabId] = now;
+      }
+
+      const elapsedPeekTime = (now - peekStartTimes[tabId]) / 1000 / 60;
+      if (elapsedPeekTime >= peekDuration) { // block site after peek time
+        chrome.tabs.update(tabId, {
+          url: chrome.runtime.getURL(`blockedScreen/index.html?site=${domain}`)
+        });
+        delete peekStartTimes[tabId]; // reset for next peek
+      }
+    } else { // No peek mode, block immediately
       chrome.tabs.update(tabId, {
         url: chrome.runtime.getURL(`blockedScreen/index.html?site=${domain}`)
       });
@@ -109,7 +133,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "getTimeLeft" && msg.domain) {
     chrome.storage.local.get(["websites"], (data) => {
-      const site = data.websites?.find(w => w.domain === msg.domain);
+      let websites = data.websites || [];
+      const site = websites.find(w => w.domain === msg.domain);
       sendResponse(site ? calculateTimeLeft(site) : 0);
     });
     return true;
