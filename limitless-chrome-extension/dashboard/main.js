@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const peekSelect = document.getElementById("peek-time");
 
     let websites = [];
-    let peekDuration = 0.25; // default 15 seconds
+    let peekDuration = 0.5; // default 30 seconds
 
     function loadAll() {
       chrome.storage.local.get(["websites", "peekDuration"], (data) => {
@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (typeof data.peekDuration !== "undefined") {
           peekDuration = Number(data.peekDuration);
         } else {
-          peekDuration = 0.25; 
+          peekDuration = 0.5; 
           chrome.storage.local.set({ peekDuration });
         }
 
