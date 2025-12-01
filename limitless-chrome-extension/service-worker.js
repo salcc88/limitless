@@ -18,6 +18,24 @@ function calculateTimeLeft(site) {
   return Math.max((site.timeLimit || 0) - (site.usage || 0), 0);
 }
 
+// get url path with trimmed www. and trailing slash
+function normalizeUrl(url) {
+  const fullUrl = new URL(url);
+  const normalizedUrl = (fullUrl.hostname.replace("www.", "") + fullUrl.pathname).replace(/\/$/, "");
+  return (normalizedUrl);
+}
+
+// get best matching site for a url path
+function getMatchingSite(normalizedFullPath, websites) {
+  // Filter all sites that match
+  const matches = websites.filter(w => normalizedFullPath.startsWith(w.domain));
+  if (!matches.length) return null;
+
+  // Pick the one with the longest domain (most specific)
+  matches.sort((a, b) => b.domain.length - a.domain.length);
+  return matches[0];
+}
+
 // Notify the user when X time is left
 function sendTimeLeftNotification(domain, minutesLeft) {
   chrome.notifications.create(`limitless-${domain}-${minutesLeft}`, {
@@ -38,10 +56,10 @@ async function trackUsage(tabId, url) {
     const tab = await chrome.tabs.get(tabId);
     if (!tab.active || tabVisibility[tabId] === false) return;
 
-    const domain = new URL(url).hostname.replace("www.", "");
+    const normalizedFullPath = normalizeUrl(url);
     chrome.storage.local.get(["websites"], (data) => {
       let websites = data.websites || [];
-      const site = websites.find(w => w.domain === domain);
+      const site = getMatchingSite(normalizedFullPath, websites);
       if (!site) return;
 
       const now = Date.now();
@@ -58,11 +76,11 @@ async function trackUsage(tabId, url) {
 }
 
 // Update badge for a site
-function updateBadge(tabId, url) {
-  const domain = new URL(url).hostname.replace("www.", "");
+function updateBadge(url) {
+  const normalizedFullPath = normalizeUrl(url);
   chrome.storage.local.get(["websites"], (data) => {
     let websites = data.websites || [];
-    const site = websites.find(w => w.domain === domain);
+    const site = getMatchingSite(normalizedFullPath, websites);
     if (!site) {
       chrome.action.setBadgeText({ text: "" });
       chrome.action.setBadgeBackgroundColor({ color: blueColor });
@@ -73,24 +91,24 @@ function updateBadge(tabId, url) {
 
     // Notification checks
     // initialize tracking object for notifications
-    if (!notifiedThresholds[domain]) {
-      notifiedThresholds[domain] = { 10: false, 5: false, 1: false };
+    if (!notifiedThresholds[normalizedFullPath]) {
+      notifiedThresholds[normalizedFullPath] = { 10: false, 5: false, 1: false };
     }
 
     // Trigger thresholds only when transitioning downward
-    if (timeLeft <= 10 && !notifiedThresholds[domain][10] && timeLeft > 9) {
-      sendTimeLeftNotification(domain, 10);
-      notifiedThresholds[domain][10] = true;
+    if (timeLeft <= 10 && !notifiedThresholds[normalizedFullPath][10] && timeLeft > 9) {
+      sendTimeLeftNotification(normalizedFullPath, 10);
+      notifiedThresholds[normalizedFullPath][10] = true;
     }
 
-    if (timeLeft <= 5 && !notifiedThresholds[domain][5] && timeLeft > 4) {
-      sendTimeLeftNotification(domain, 5);
-      notifiedThresholds[domain][5] = true;
+    if (timeLeft <= 5 && !notifiedThresholds[normalizedFullPath][5] && timeLeft > 4) {
+      sendTimeLeftNotification(normalizedFullPath, 5);
+      notifiedThresholds[normalizedFullPath][5] = true;
     }
 
-    if (timeLeft <= 1 && !notifiedThresholds[domain][1] && timeLeft > 0.9) {
-      sendTimeLeftNotification(domain, 1);
-      notifiedThresholds[domain][1] = true;
+    if (timeLeft <= 1 && !notifiedThresholds[normalizedFullPath][1] && timeLeft > 0.9) {
+      sendTimeLeftNotification(normalizedFullPath, 1);
+      notifiedThresholds[normalizedFullPath][1] = true;
     }
 
     //Badge logic
@@ -115,10 +133,10 @@ function updateBadge(tabId, url) {
 
 // Block a website if limit reached
 function checkAndBlock(tabId, url) {
-  const domain = new URL(url).hostname.replace("www.", "");
+  const normalizedFullPath = normalizeUrl(url);
   chrome.storage.local.get(["websites", "peekDuration"], (data) => {
     let websites = data.websites || [];
-    const site = websites.find(w => w.domain === domain);
+    const site = getMatchingSite(normalizedFullPath, websites);
     if (!site) return;
 
     const timeLeft = calculateTimeLeft(site);
@@ -157,13 +175,13 @@ function checkAndBlock(tabId, url) {
       const elapsedPeekTime = (now - peekStartTimes[tabId]) / 1000 / 60;
       if (elapsedPeekTime >= peekDuration) { // block site after peek time
         chrome.tabs.update(tabId, {
-          url: chrome.runtime.getURL(`blockedScreen/index.html?site=${domain}`)
+          url: chrome.runtime.getURL(`blockedScreen/index.html?site=${site.domain}`)
         });
         delete peekStartTimes[tabId]; // reset for next peek
       }
     } else { // No peek mode, block immediately
       chrome.tabs.update(tabId, {
-        url: chrome.runtime.getURL(`blockedScreen/index.html?site=${domain}`)
+        url: chrome.runtime.getURL(`blockedScreen/index.html?site=${site.domain}`)
       });
     }
   });
@@ -190,7 +208,7 @@ function resetDailyUsage() {
         // Refresh badge for active tab if necessary
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0] && tabs[0].url) {
-            updateBadge(tabs[0].id, tabs[0].url);
+            updateBadge(tabs[0].url);
           }
         });
       });
@@ -210,19 +228,23 @@ function scheduleMidnightReset() {
 
 // Listeners for immediate updates
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete" && tab.url) {
-    trackUsage(tabId, tab.url);
-    updateBadge(tabId, tab.url);
+  if (tab.url) {
+    // Block immediately at ANY stage of loading
     checkAndBlock(tabId, tab.url);
+    updateBadge(tab.url);
+  }
+
+  if (changeInfo.status === "complete" && tab.url) { // Fire after page is finished loading
+    trackUsage(tabId, tab.url);
   }
 });
 
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   const tab = await chrome.tabs.get(activeInfo.tabId);
   if (tab.url) {
-    trackUsage(tab.id, tab.url);
-    updateBadge(tab.id, tab.url);
     checkAndBlock(tab.id, tab.url);
+    updateBadge(tab.url);
+    trackUsage(tab.id, tab.url);
   }
 });
 
@@ -287,9 +309,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       const tabId = tabs[0].id;
       const url = tabs[0].url;
 
-      trackUsage(tabId, url);
-      updateBadge(tabId, url);
       checkAndBlock(tabId, url);
+      updateBadge(url);
+      trackUsage(tabId, url);
     });
   } else if (alarm.name === "midnightReset") {
     resetDailyUsage();

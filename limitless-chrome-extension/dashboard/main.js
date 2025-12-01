@@ -174,7 +174,7 @@ document.addEventListener("DOMContentLoaded", () => {
     addNewButton.addEventListener("click", () => {
       const rawInput = newDomainInput.value.toLowerCase().trim(); // remove whitespace
       if (!rawInput) return;
-      const cleanedInput = rawInput.replace(/^www\./, ""); // remove www.
+      const cleanedInput = rawInput.replace(/^www\./, "").replace(/\/$/, ""); // remove www. and trailing slash
       if (websites.find(site => site.domain === cleanedInput)) {
         alert("You already have a limit for this domain.");
         return;
