@@ -21,7 +21,11 @@
   --switch-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
+/*****************/
+
 /* global styles */
+
+/*****************/
 
 html {
   font-family: 'Plus Jakarta Sans', sans-serif;
@@ -59,9 +63,13 @@ h3 { font-size: 1.2rem; }
 .blue {
   color: var(--blue);
 }
+.red {
+  color: var(--red);
+}
 
-
+/**********************/
 /* buttons and inputs */
+/**********************/
 
 button { 
   display: flex;
@@ -163,10 +171,15 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
 .toggle-switch input:checked + .switch-slider {
   background-color: var(--blue-highlight);
 }
+.toggle-switch input:checked + .switch-slider.danger {
+  background-color: var(--red);
+}
 
 .toggle-switch input:focus-visible + .switch-slider {
-  background-color: var(--blue-highlight);
   outline: 1px solid black;
+}
+.toggle-switch input:focus-visible + .switch-slider:before {
+  transform: translateX(4px);
 }
 
 .toggle-switch input:checked + .switch-slider:before {
@@ -180,8 +193,11 @@ ul { /* used for site lists */
 }
 
 /*************************/
+
 /*   Dashboard Styles    */
+
 /*************************/
+
 .dashboard-wrap {
   width: 60%;
   margin: 50px auto;
@@ -192,7 +208,9 @@ ul { /* used for site lists */
   overflow: hidden;
   box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
 }
+/*******************/
 /* blue header bar */
+/*******************/
 .dash-header {
   width: 100%;
   display: flex;
@@ -216,18 +234,11 @@ ul { /* used for site lists */
   display: flex;
   flex-direction: column;
   padding: 2rem;
-  gap: 1.5rem;
+  gap: 2rem;
 }
+/***********************/
 /* individual sections */
-.dash-section {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-.dash-section p {
-  margin: 0.5rem 0 0.5rem 1rem;
-}
+/***********************/
 .section-title {
   display: flex;
   width: 100%;
@@ -242,31 +253,40 @@ ul { /* used for site lists */
   flex-grow: 1;
   background-color: var(--blue);
 }
-/* add new section */
-.add-new-wrap {
+p.section-desc {
+  margin: 0.5rem 0 0.5rem 1rem;
+}
+
+.flexrow-tight { /* add new section, peek mode wrappers */
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+.flexrow-loose { /* site list categories */
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.flexcol-tight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.left-m-1 {
   margin-left: 1rem;
 }
 
 /* limits section */
-.dash-section ul {
-  margin-left: 1rem;
-}
-.dashboard-wrap li {
+
+.dashboard-wrap li { /* website list items */
   display: flex;
   align-items: center;
   gap: 1rem;
   margin-bottom: 0.5rem;
   width: 100%;
 }
-.list-headers {
-  margin-left: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
+
 span.site-name {
   width: 200px;
 }
@@ -290,24 +310,12 @@ select { /* time limit selectors */
   background-color: var(--white);
 }
 
-/* peek mode section */
-.peek-wrap {
-  margin-left: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 /* schedule section */
 
-.schedule-row {
-  margin-left: 1rem;
-  display: flex;
-  gap: 1rem;
-}
 .schedule-col {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 0.5rem;
 }
 .day-toggles {
@@ -359,14 +367,14 @@ select { /* time limit selectors */
   outline: 1px solid black;
 }
 
-.times-wrap {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+footer {
+  text-align: center;
 }
 
 /*************************/
+
 /*     Popup Styles      */
+
 /*************************/
 
 .popup-header {
@@ -394,7 +402,9 @@ select { /* time limit selectors */
 }
 
 /*************************/
+
 /* Blocked Screen Styles */
+
 /*************************/
 
 .blocked-wrap {

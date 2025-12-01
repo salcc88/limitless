@@ -19,40 +19,43 @@
 
       <div class="dash-content">
         
-        <div class="dash-section">
+        <!-- ADD NEW LIMIT -->
+        <div class="flexcol-tight section-can-disable">
           <div class="section-title">
             <h3 class="blue">Add New Limit</h3>
             <div class="line"></div>
           </div>
-          <p class="subtext">Enter a website to set up a new daily time limit.</p>
-          <div class="add-new-wrap">
+          <p class="section-desc subtext">Enter a website to set up a new daily time limit.</p>
+          <div class="flexrow-tight left-m-1">
             <input type="text" id="domain-entry" placeholder="example.com">
             <button id="add-site" class="add-new" disabled>Create New Limit</button>
           </div>
         </div>
 
-        <div class="dash-section">
+        <!-- WEBSITE LIMITS -->
+        <div class="flexcol-tight section-can-disable">
           <div class="section-title">
             <h3 class="blue">Website Limits</h3>
             <div class="line"></div>
           </div>
-          <p class="subtext">Configure settings by website.</p>
-          <div class="list-headers">
+          <p class="section-desc subtext">Configure settings by website.</p>
+          <div class="flexrow-loose left-m-1">
             <span class="site-name subtext blue">Website</span>
             <span class="limit-text subtext blue">Daily Limit</span>
             <span class="peek-text subtext blue">Peek Mode</span>
             <span class="time-left subtext blue">Time Left</span>
           </div>
-          <ul id="site-list"></ul>
+          <ul id="site-list" class="left-m-1"></ul>
         </div>
 
-        <div class="dash-section">
+        <!-- PEEK MODE -->
+        <div class="flexcol-tight section-can-disable">
           <div class="section-title">
             <h3 class="blue">Peek Mode Duration</h3>
             <div class="line"></div>
           </div>
-          <p class="subtext">Peek Mode allows you to briefly visit blocked websites to get the info you need without losing focus.</p>
-          <div class="peek-wrap">
+          <p class="section-desc subtext">Peek Mode allows you to briefly visit blocked websites to get the info you need without losing focus.</p>
+          <div class="flexrow-tight left-m-1">
             <label for="peek-time" class="base-text">Duration</label>
             <select id="peek-time" class="base-text">
               <option value="0.25">15 sec</option>
@@ -63,14 +66,15 @@
           </div>
         </div>
 
-        <div class="dash-section">
+        <!-- SCHEDULE -->
+        <div class="flexcol-tight section-can-disable">
           <div class="section-title">
             <h3 class="blue">Schedule</h3>
             <div class="line"></div>
           </div>
-          <p class="subtext">Set a schedule for when your limits are active.</p>
+          <p class="section-desc subtext">Set a schedule for when your limits are active.</p>
           
-          <div class="schedule-row">
+          <div class="flexrow-loose left-m-1">
             <div class="schedule-col">
               <span class="subtext blue">All Week</span>
               <label class="toggle-switch">
@@ -78,7 +82,7 @@
                 <span class="switch-slider"></span> 
               </label>
             </div>
-            <div class="schedule-col">
+            <div class="schedule-col all-week-can-disable">
               <span class="subtext blue">Select Days</span>
               <div class="day-toggles">
                 <label><input type="checkbox" id="day-sun" class="day-checkbox" value="0"><span class="base-text">Sun</span></label>
@@ -92,7 +96,7 @@
             </div>
           </div>
 
-          <div class="schedule-row">
+          <div class="flexrow-loose left-m-1">
             <div class="schedule-col">
               <span class="subtext blue">All Day</span>
               <label class="toggle-switch">
@@ -100,9 +104,9 @@
                 <span class="switch-slider"></span> 
               </label>
             </div>
-            <div class="schedule-col">
+            <div class="schedule-col all-day-can-disable">
               <span class="subtext blue">Select Times</span>
-              <div class="times-wrap">
+              <div class="flexrow-tight">
                 <span class="base-text">From</span>
                 <select id="start-time" class="base-text"></select>
                 <span class="base-text">To</span>
@@ -111,6 +115,25 @@
             </div>
           </div>
         </div>
+
+        <!-- DISABLE -->
+        <div class="flexcol-tight">
+          <div class="section-title">
+            <h3 class="blue">Disable Limitless</h3>
+            <div class="line"></div>
+          </div>
+          <p class="section-desc subtext red">Disable all Limitless functionality.</p>
+          <label class="toggle-switch left-m-1">
+            <input type="checkbox" id="kill-switch">
+            <span class="switch-slider danger"></span> 
+          </label>
+        </div>
+
+        <!-- FOOTER -->
+        <footer>
+          <p class="section-desc subtext">Limitless is open-source and free. Your data and time are kept safe.</p>
+        </footer>
+
       </div>
     </div>
 
