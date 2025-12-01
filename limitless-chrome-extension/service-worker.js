@@ -5,10 +5,10 @@ const activeTabTimes = {}; // last timestamp per active tab
 const tabVisibility = {}; // visibility state per tabId
 const peekStartTimes = {}; // key: tabId, value: timestamp when peek started
 
-const blueColor = rootStyles.getPropertyValue('--blue').trim();
-const orangeColor = rootStyles.getPropertyValue('--orange').trim();
-const redColor = rootStyles.getPropertyValue('--red').trim();
-const grayColor = rootStyles.getPropertyValue('--gray').trim();
+const blueColor = "#43DABE";
+const orangeColor = "#FFC66B";
+const redColor = "#FF6B6B";
+const grayColor = "#1D1D1D";
 
 // Calculate remaining time
 function calculateTimeLeft(site) {

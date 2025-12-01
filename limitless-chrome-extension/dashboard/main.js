@@ -44,13 +44,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function renderSites() {
       siteList.innerHTML = "";
+
+      if (websites.length === 0) {
+        const li = document.createElement("li");
+        li.classList.add("subtext");
+        li.textContent = "No limits set.";
+        siteList.appendChild(li);
+        return;
+      }
+
       websites.forEach((site, index) => {
         const li = document.createElement("li");
+
         const domainSpan = document.createElement("span");
         domainSpan.textContent = site.domain;
-        domainSpan.classList.add("site-name");
+        domainSpan.classList.add("site-name", "base-text");
+
         const timeSelect = document.createElement("select");
         timeSelect.id = "time-select" + index;
+        timeSelect.classList.add("base-text");
 
         for (let i = 0; i <= 180; i += 5) { // Add timer options, 0 to 180 minutes
           const option = document.createElement("option");
@@ -60,11 +72,21 @@ document.addEventListener("DOMContentLoaded", () => {
           timeSelect.appendChild(option);
         }
 
+        // Construct toggle switch checkbox
+        const toggleWrapper = document.createElement("label");
+        toggleWrapper.classList.add("toggle-switch");
+
         const peekCheckbox = document.createElement("input");
         peekCheckbox.type = "checkbox";
         peekCheckbox.id = "peek-check" + index;
         peekCheckbox.checked = !!site.peekMode;
 
+        const sliderSpan = document.createElement("span");
+        sliderSpan.classList.add("switch-slider");
+
+        toggleWrapper.append(peekCheckbox, sliderSpan);
+
+        // delete button
         const deleteBtn = document.createElement("button");
         deleteBtn.textContent = "Delete";
         deleteBtn.classList.add("delete");
@@ -72,14 +94,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const timeLeftSpan = document.createElement("span");
         timeLeftSpan.dataset.index = String(index);
-        timeLeftSpan.classList.add("time-left");
+        timeLeftSpan.classList.add("time-left", "subtext");
 
-        li.append(domainSpan, timeSelect, peekCheckbox, timeLeftSpan, deleteBtn);
+        li.append(domainSpan, timeSelect, toggleWrapper, timeLeftSpan, deleteBtn);
         siteList.appendChild(li);
 
         function updateTimeLeft() {
           const timeLeft = Math.max((site.timeLimit || 0) - (site.usage || 0), 0);
-          timeLeftSpan.textContent = `Time left: ${timeLeft > 1 ? Math.floor(timeLeft) : 0} min`;
+          timeLeftSpan.textContent = `${timeLeft > 1 ? Math.floor(timeLeft) : 0} min`;
         }
 
         updateTimeLeft();

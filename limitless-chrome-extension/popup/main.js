@@ -15,20 +15,32 @@ function renderSites() {
     siteList.innerHTML = "";
     const websites = data.websites || [];
 
+    if (websites.length === 0) {
+      const li = document.createElement("li");
+      li.classList.add("subtext");
+      li.textContent = "No limits set.";
+      siteList.appendChild(li);
+      return;
+    }
+
     websites.forEach(site => {
       const li = document.createElement("li");
-      li.textContent = site.domain + ":";
+
+      const websiteSpan = document.createElement("span");
+      websiteSpan.classList.add("subtext");
+      websiteSpan.textContent = site.domain + ":";
 
       const timeLeftSpan = document.createElement("span");
+      timeLeftSpan.classList.add("subtext");
       function updateTimeLeft() {
         const timeLeft = calculateTimeLeft(site);
-        timeLeftSpan.textContent = `Time left: ${timeLeft > 1 ? Math.floor(timeLeft) : 0} min`;
+        timeLeftSpan.textContent = `${timeLeft > 1 ? Math.floor(timeLeft) : 0} min left`;
       }
 
       updateTimeLeft();
       setInterval(updateTimeLeft, 5000); // update every 5 seconds
 
-      li.appendChild(timeLeftSpan);
+      li.append(websiteSpan, timeLeftSpan);
       siteList.appendChild(li);
     });
   });

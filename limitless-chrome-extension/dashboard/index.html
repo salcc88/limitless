@@ -8,23 +8,60 @@
   </head>
   <body>
     <div class="dashboard-wrap">
-      <h2>Limitless</h2>
-
-      <div class="add-new-wrap">
-        <input type="text" id="domain-entry" placeholder="example.com">
-        <button id="add-site" class="add-new" disabled>Add New Website</button>
+      <div class="dash-header">
+        <h2>Limitless</h2>
+        <svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+          <path d="M31.91,60.79h0c5.52,0,10.52-.23,14.14-3.67.04-.03.07-.07.11-.1,5.53-5.34,4.15-14.26-2.61-18.12l-23.28-13.28c-6.76-3.86-8.14-12.78-2.61-18.12.04-.03.07-.07.11-.1,3.62-3.44,8.62-3.67,14.14-3.67h0c5.52,0,10.52.23,14.14,3.67.04.03.07.07.11.1,5.53,5.34,4.15,14.26-2.61,18.12l-23.28,13.28c-6.76,3.86-8.14,12.78-2.61,18.12.04.03.07.07.11.1,3.62,3.44,8.62,3.67,14.14,3.67Z" style="fill: none; stroke: #ffffff; stroke-miterlimit: 10; stroke-width: 6px;"/>
+          <path d="M41.18,48.58c0,4-4.11,4.62-9.18,4.62s-9.18-.63-9.18-4.62,6.75-5.72,9.18-7.24c2.1,1.49,9.18,3.24,9.18,7.24Z" style="fill: #ffffff;"/>
+        </svg>
       </div>
 
-      <ul id="site-list"></ul>
+      <div class="dash-content">
+        
+        <div class="dash-section">
+          <div class="section-title">
+            <h3 class="blue">Add New Limit</h3>
+            <div class="line"></div>
+          </div>
+          <p class="subtext">Enter a website to set up a new daily time limit.</p>
+          <div class="add-new-wrap">
+            <input type="text" id="domain-entry" placeholder="example.com">
+            <button id="add-site" class="add-new" disabled>Create New Limit</button>
+          </div>
+        </div>
 
-      <div class="peek-wrap">
-        <label for="peek-time">Sneak Peek Duration:</label>
-        <select id="peek-time">
-          <option value="0.25">15 sec</option>
-          <option value="0.5">30 sec</option>
-          <option value="1">1 min</option>
-          <option value="2">2 min</option>
-        </select>
+        <div class="dash-section">
+          <div class="section-title">
+            <h3 class="blue">Website Limits</h3>
+            <div class="line"></div>
+          </div>
+          <p class="subtext">Pin the extension to the toolbar to see a live timer.</p>
+          <div class="list-headers">
+            <span class="site-name subtext blue">Website</span>
+            <span class="limit-text subtext blue">Daily Limit</span>
+            <span class="peek-text subtext blue">Peek Mode</span>
+            <span class="time-left subtext blue">Time Left</span>
+          </div>
+          <ul id="site-list"></ul>
+        </div>
+
+        <div class="dash-section">
+          <div class="section-title">
+            <h3 class="blue">Peek Mode Duration</h3>
+            <div class="line"></div>
+          </div>
+          <p class="subtext">Peek Mode allows you to briefly see a website's contents before the limit activates.</p>
+          <div class="peek-wrap">
+            <label for="peek-time" class="base-text">Duration:</label>
+            <select id="peek-time" class="base-text">
+              <option value="0.25">15 sec</option>
+              <option value="0.5">30 sec</option>
+              <option value="1">1 min</option>
+              <option value="2">2 min</option>
+            </select>
+          </div>
+        </div>
+
       </div>
     </div>
 
