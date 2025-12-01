@@ -12,6 +12,50 @@ const orangeColor = "#FFC66B";
 const redColor = "#FF6B6B";
 const grayColor = "#1D1D1D";
 
+// check if disabled
+async function getStorage(keys) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(keys, resolve);
+  });
+}
+function timeStringToMinutes(str) {
+  const [h, m] = str.split(":").map(Number);
+  return h * 60 + m;
+}
+async function checkIfDisabled() {
+  const data = await getStorage([
+    "disableAll",
+    "allWeek",
+    "allDay",
+    "weekSchedule",
+    "scheduleStart",
+    "scheduleEnd"
+  ]);
+
+  if (data.disableAll) return true; // Kill switch active
+
+  const now = new Date();
+  const currentDay = now.getDay(); 
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  // Days allowed
+  let isDayAllowed = true;
+  if (!data.allWeek) {
+    const mask = (data.weekSchedule == null) ? 0b1111111 : Number(data.weekSchedule);
+    isDayAllowed = !!(mask & (1 << currentDay));
+  }
+
+  // Time allowed
+  let isTimeAllowed = true;
+  if (!data.allDay) {
+    const start = timeStringToMinutes(data.scheduleStart || "09:00");
+    const end = timeStringToMinutes(data.scheduleEnd || "17:30");
+    isTimeAllowed = currentTime >= start && currentTime <= end;
+  }
+
+  return !(isDayAllowed && isTimeAllowed); // true = disabled, false = enabled
+}
+
 // Calculate remaining time
 function calculateTimeLeft(site) {
   if (!site) return 0;
@@ -50,7 +94,8 @@ function sendTimeLeftNotification(domain, minutesLeft) {
 
 // Track usage only for the tab if it's visible
 async function trackUsage(tabId, url) {
-  if (typeof tabId !== "number") return;
+  const disabled = await checkIfDisabled();
+  if (disabled || typeof tabId !== "number") return;
 
   try {
     const tab = await chrome.tabs.get(tabId);
@@ -76,7 +121,10 @@ async function trackUsage(tabId, url) {
 }
 
 // Update badge for a site
-function updateBadge(url) {
+async function updateBadge(url) {
+  const disabled = await checkIfDisabled();
+  if (disabled) return;
+
   const normalizedFullPath = normalizeUrl(url);
   chrome.storage.local.get(["websites"], (data) => {
     let websites = data.websites || [];
@@ -132,7 +180,10 @@ function updateBadge(url) {
 }
 
 // Block a website if limit reached
-function checkAndBlock(tabId, url) {
+async function checkAndBlock(tabId, url) {
+  const disabled = await checkIfDisabled();
+  if (disabled) return;
+
   const normalizedFullPath = normalizeUrl(url);
   chrome.storage.local.get(["websites", "peekDuration"], (data) => {
     let websites = data.websites || [];
@@ -229,7 +280,7 @@ function scheduleMidnightReset() {
 // Listeners for immediate updates
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (tab.url) {
-    // Block immediately at ANY stage of loading
+    // Block immediately before page load
     checkAndBlock(tabId, tab.url);
     updateBadge(tab.url);
   }
@@ -254,6 +305,16 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     delete peekNotified[tabId];
     delete tabVisibility[tabId];
     delete activeTabTimes[tabId];
+});
+
+// send disabled status to popup
+chrome.runtime.onMessage.addListener((msg, sender, respond) => {
+  if (msg.type === "CHECK_DISABLED") {
+    checkIfDisabled().then(disabled => {
+      respond({ disabled });
+    });
+    return true;
+  }
 });
 
 // Listen for visibility messages from content script
@@ -283,7 +344,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // Periodic badge updates for active tab
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.alarms.create("updateBadge", { periodInMinutes: 5 / 60 });
+  chrome.alarms.create("updateBadge", { periodInMinutes: 5 / 60 }); // every 5 seconds
   chrome.action.setBadgeBackgroundColor({ color: blueColor });
   chrome.action.setBadgeText({ text: "" });
 

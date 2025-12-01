@@ -6,12 +6,11 @@ function reportVisibility() {
       visible: document.visibilityState === "visible"
     });
   } catch (e) {
-    console.warn("Failed to send visibility message:", e);
+    // console.warn("Failed to send visibility message:", e);
   }
 }
 
 // Listen for visibility changes
 document.addEventListener("visibilitychange", reportVisibility);
 
-// Initial report
 reportVisibility();

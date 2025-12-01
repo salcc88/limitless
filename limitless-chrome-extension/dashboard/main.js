@@ -1,29 +1,43 @@
 document.addEventListener("DOMContentLoaded", () => {
+    // get elements
     const siteList = document.getElementById("site-list");
     const addNewButton = document.getElementById("add-site");
     const newDomainInput = document.getElementById("domain-entry");
     const peekSelect = document.getElementById("peek-time");
-
-    let websites = [];
-    let peekDuration = 0.5; // default 30 seconds
-
-    // Construct start and end time selects
+    const killSwitchToggle = document.getElementById("kill-switch");
+    const dashSections = document.querySelectorAll(".killswitch-can-disable")
+    // schedule elements
+    const allWeekToggle = document.getElementById("all-week-toggle");
+    const weekContainer = document.querySelector(".all-week-can-disable");
+    const allDayToggle = document.getElementById("all-day-toggle");
+    const dayTimeContainer = document.querySelector(".all-day-can-disable");
+    const weekCheckboxes = document.querySelectorAll(".day-checkbox");
     const startSelect = document.getElementById("start-time");
     const endSelect = document.getElementById("end-time");
 
+    let websites = [];
+    let peekDuration = 0.5; // default 30 seconds
+    let weekScheduleMask = 0b0000000;
+    let allWeek = true;
+    let allDay = true
+    let scheduleStart = "09:00"; 
+    let scheduleEnd = "17:30";
+    let disableAll = false
+
+    // Construct start and end time selects
     function generateTimeOptions(selectElement) {
       for (let hour = 0; hour < 24; hour++) {
         for (let min = 0; min < 60; min += 30) {
           // Format value as 24-hour string for storage
-          const hh24 = hour.toString().padStart(2, "0");
+          const hour24 = hour.toString().padStart(2, "0");
           const mm = min.toString().padStart(2, "0");
-          const value = `${hh24}:${mm}`;
+          const value = `${hour24}:${mm}`;
         
           // Format label as 12-hour for display
-          let hh12 = hour % 12;
-          if (hh12 === 0) hh12 = 12;
+          let hour12 = hour % 12;
+          if (hour12 === 0) hour12 = 12;
           const period = hour < 12 ? "AM" : "PM";
-          const label = `${hh12}:${mm} ${period}`;
+          const label = `${hour12}:${mm} ${period}`;
         
           const option = document.createElement("option");
           option.value = value;      // keep 24-hour format for storage
@@ -32,27 +46,89 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }
-
     generateTimeOptions(startSelect);
     generateTimeOptions(endSelect);
 
-    // Optional: set default values
-    startSelect.value = "09:00";
-    endSelect.value = "17:30";
+    // week schedule helpers
+    function getWeekScheduleMask() {
+      return Array.from(weekCheckboxes).reduce((mask, box) => {
+        const dayIndex = parseInt(box.value);
+        return box.checked ? mask | (1 << dayIndex) : mask;
+      }, 0);
+    }
+    function setWeekScheduleMask(mask) {
+      weekCheckboxes.forEach(box => {
+        const dayIndex = parseInt(box.value);
+        box.checked = !!(mask & (1 << dayIndex));
+      });
+    }
+    function updateDisabledWeekStyles() {
+      if (!weekContainer) return;
+      weekContainer.classList.toggle("disabled", allWeekToggle.checked);
+      weekCheckboxes.forEach(box => box.disabled = allWeekToggle.checked);
+    }
+    function updateDisabledDayStyles() {
+      if (!dayTimeContainer) return;
+      dayTimeContainer.classList.toggle("disabled", allDayToggle.checked);
+    }
+    function updateWeekSchedule(mask) {
+      weekScheduleMask = mask;
+      setWeekScheduleMask(weekScheduleMask);
+      saveConfiguration("weekSchedule", weekScheduleMask)
+    }
+
+    // style helper for kill switch
+    function updateDisabledSectionStyles() {
+      if (!dashSections) return;
+      dashSections.forEach( section => { 
+        section.classList.toggle("disabled", disableAll);
+      });
+    }
 
     function loadAll() {
-      chrome.storage.local.get(["websites", "peekDuration"], (data) => {
-        websites = Array.isArray(data.websites) ? data.websites : [];
-    
-        if (typeof data.peekDuration !== "undefined") {
-          peekDuration = Number(data.peekDuration);
-        } else {
-          peekDuration = 0.5; 
-          chrome.storage.local.set({ peekDuration });
+      chrome.storage.local.get([
+        "websites", 
+        "peekDuration",
+        "allWeek",
+        "weekSchedule", 
+        "scheduleStart", 
+        "scheduleEnd",
+        "allDay",
+        "disableAll",
+      ], (data) => {
+
+        function loadDataAndCheck( key, defaultValue ) {
+          const storageValue = data[key];
+          if (typeof storageValue === 'undefined') {
+            chrome.storage.local.set({ [key]: defaultValue });
+            return defaultValue;
+          }
+          return storageValue;
         }
 
-      peekSelect.value = String(peekDuration);
-      renderSites();
+        // initialize to defaults if not found
+        websites = Array.isArray(data.websites) ? data.websites : [];
+        peekDuration = Number(loadDataAndCheck("peekDuration", 0.5));
+        allWeek = loadDataAndCheck("allWeek", true);
+        allDay = loadDataAndCheck("allDay", true);
+        weekScheduleMask = Number(loadDataAndCheck("weekSchedule", 0b0000000));
+        scheduleStart = String(loadDataAndCheck("scheduleStart", "09:00"));
+        scheduleEnd = String(loadDataAndCheck("scheduleEnd", "17:30"));
+        disableAll = loadDataAndCheck("disableAll", false);
+
+        //Set ui values
+        allWeekToggle.checked = allWeek;
+        allDayToggle.checked = allDay;
+        killSwitchToggle.checked = disableAll;
+        updateDisabledWeekStyles();
+        updateDisabledDayStyles();
+        updateDisabledSectionStyles();
+
+        setWeekScheduleMask(weekScheduleMask);
+        startSelect.value = String(scheduleStart);
+        endSelect.value = String(scheduleEnd);
+        peekSelect.value = String(peekDuration);
+        renderSites();
       });
     }
 
@@ -69,10 +145,8 @@ document.addEventListener("DOMContentLoaded", () => {
         chrome.storage.local.set({ websites: updatedData });
       });
     }
-
-    function savePeekDuration(value) {
-      peekDuration = Number(value);
-      chrome.storage.local.set({ peekDuration });
+    function saveConfiguration(key, value) {
+      chrome.storage.local.set({ [key]: value});
     }
 
     function renderSites() {
@@ -89,11 +163,11 @@ document.addEventListener("DOMContentLoaded", () => {
       websites.forEach((site, index) => {
         const li = document.createElement("li");
 
-        const domainSpan = document.createElement("span");
+        const domainSpan = document.createElement("span"); // website name
         domainSpan.textContent = site.domain;
         domainSpan.classList.add("site-name", "base-text");
 
-        const timeSelect = document.createElement("select");
+        const timeSelect = document.createElement("select"); // time limit
         timeSelect.id = "time-select" + index;
         timeSelect.classList.add("base-text");
 
@@ -125,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
         deleteBtn.classList.add("delete");
         deleteBtn.dataset.index = String(index);
 
-        const timeLeftSpan = document.createElement("span");
+        const timeLeftSpan = document.createElement("span"); // time left display
         timeLeftSpan.dataset.index = String(index);
         timeLeftSpan.classList.add("time-left", "subtext");
 
@@ -139,13 +213,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         updateTimeLeft();
 
-        timeSelect.addEventListener("change", () => {
+        timeSelect.addEventListener("change", () => { // save and update timer when limit is changed
           site.timeLimit = Number(timeSelect.value);
           saveWebsites();
           updateTimeLeft();
         });
 
-        peekCheckbox.addEventListener("change", () => {
+        peekCheckbox.addEventListener("change", () => { // update peek mode
           site.peekMode = peekCheckbox.checked;
           saveWebsites();
         });
@@ -161,6 +235,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // input listeners
+
+    //domain input
     newDomainInput.addEventListener("input", () => {
       addNewButton.disabled = newDomainInput.value.trim() === "";
     })
@@ -191,11 +267,57 @@ document.addEventListener("DOMContentLoaded", () => {
       addNewButton.disabled = true;
     });
 
+    // peek mode toggle
     peekSelect.addEventListener("change", () => {
-      peekValue = Number(peekSelect.value);
-      savePeekDuration(peekValue);
-      peekSelect.value = String(peekValue);
+      peekDuration = Number(peekSelect.value);
+      saveConfiguration("peekDuration", peekDuration);
     });
+
+    // schedule - times of day
+    startSelect.addEventListener("change", () => { // save and update timer when limit is changed
+      scheduleStart = startSelect.value;
+      saveConfiguration("scheduleStart", scheduleStart);
+    });
+    endSelect.addEventListener("change", () => { // save and update timer when limit is changed
+      scheduleEnd = endSelect.value;
+      saveConfiguration("scheduleEnd", scheduleEnd);
+    });
+    allDayToggle.addEventListener("change", () => {
+      allDay = allDayToggle.checked;
+      saveConfiguration("allDay", allDay);
+      updateDisabledDayStyles()
+    });
+    // Schedule - week toggles
+    weekCheckboxes.forEach(box => {
+      box.addEventListener("change", () => {
+        const mask = getWeekScheduleMask();
+        updateWeekSchedule(mask)
+      });
+    });
+    allWeekToggle.addEventListener("change", () => {
+      allWeek = allWeekToggle.checked;
+      saveConfiguration("allWeek", allWeek);
+      updateDisabledWeekStyles();
+    });
+
+    // Kill switch
+    killSwitchToggle.addEventListener("change", () => {
+      disableAll = killSwitchToggle.checked;
+      saveConfiguration("disableAll", disableAll);
+      updateDisabledSectionStyles();
+    })
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const el = document.activeElement;
+
+        if (el && el.type === "checkbox") {
+          el.checked = !el.checked;
+          el.dispatchEvent(new Event("change")); // trigger change listeners
+          e.preventDefault();
+        }
+      }
+    })
 
     loadAll();
 });

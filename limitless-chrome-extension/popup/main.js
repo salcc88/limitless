@@ -8,48 +8,24 @@ function calculateTimeLeft(site) {
   const usage = site.usage || 0;
   return Math.max(limit - usage, 0);
 }
-
-// Render list of websites
-function renderSites() {
-  chrome.storage.local.get(["websites"], (data) => {
-    siteList.innerHTML = "";
-    const websites = data.websites || [];
-
-    if (websites.length === 0) {
-      const li = document.createElement("li");
-      li.classList.add("subtext");
-      li.textContent = "No limits set.";
-      siteList.appendChild(li);
-      return;
-    }
-
-    websites.forEach(site => {
-      const li = document.createElement("li");
-
-      const websiteSpan = document.createElement("span");
-      websiteSpan.classList.add("subtext");
-      websiteSpan.textContent = site.domain + ":";
-
-      const timeLeftSpan = document.createElement("span");
-      timeLeftSpan.classList.add("subtext");
-      function updateTimeLeft() {
-        const timeLeft = calculateTimeLeft(site);
-        timeLeftSpan.textContent = `${timeLeft > 1 ? Math.floor(timeLeft) : 0} min left`;
-      }
-
-      updateTimeLeft();
-      setInterval(updateTimeLeft, 5000); // update every 5 seconds
-
-      li.append(websiteSpan, timeLeftSpan);
-      siteList.appendChild(li);
-    });
-  });
+function getMatchingSite(normalizedFullPath, websites) {
+  const matches = websites.filter(w => normalizedFullPath.startsWith(w.domain));
+  if (!matches.length) return null;
+  matches.sort((a, b) => b.domain.length - a.domain.length);
+  return matches[0];
 }
+
+// ask for disabled status
+chrome.runtime.sendMessage({ type: "CHECK_DISABLED" }, (res) => {
+  const disabled = res?.disabled;
+  const statusSpan = document.getElementById("status");
+
+  statusSpan.textContent = disabled ? 'Inactive' : 'Active';
+  statusSpan.classList.toggle('off', disabled);
+});
 
 // Open dashboard
 configureBtn.addEventListener("click", () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("dashboard/index.html") });
 });
 
-// Initial render
-renderSites();

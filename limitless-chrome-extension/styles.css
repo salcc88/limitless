@@ -66,6 +66,15 @@ h3 { font-size: 1.2rem; }
 .red {
   color: var(--red);
 }
+.killswitch-can-disable,
+.all-week-can-disable,
+.all-day-can-disable {
+  transition: opacity 100ms;
+}
+.disabled {
+  opacity: 0.2;
+  pointer-events: none;
+}
 
 /**********************/
 /* buttons and inputs */
@@ -387,18 +396,23 @@ footer {
 .popup-header h3 {
   color: var(--white);
 }
-
 .popup-content {
   display: flex;
   flex-direction: column;
   padding: 1rem;
-  gap: 1rem;
+  gap: 0.5rem;
   width: 180px;
   background-color: var(--white);
 }
-.popup-content ul li {
+.status-box {
   display: flex;
   justify-content: space-between;
+}
+#status {
+  color: var(--blue);
+}
+#status.off {
+  color: var(--red);
 }
 
 /*************************/
