@@ -10,7 +10,6 @@ function reportVisibility() {
   }
 }
 
-
 // Listen for visibility changes
 document.addEventListener("visibilitychange", reportVisibility);
 

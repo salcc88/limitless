@@ -226,6 +226,14 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   }
 });
 
+// Clean up state when a tab is closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+    delete peekStartTimes[tabId];
+    delete peekNotified[tabId];
+    delete tabVisibility[tabId];
+    delete activeTabTimes[tabId];
+});
+
 // Listen for visibility messages from content script
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "tab-visibility" && sender.tab) {
