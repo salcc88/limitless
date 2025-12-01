@@ -16,6 +16,9 @@
   --gray: #1D1D1D;
   --light-gray: #888888;
   --white: #FFFFFF;
+
+  --inner-shadow: 0 2px 12px rgba(0,0,0,0.3) inset;
+  --switch-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
 /* global styles */
@@ -50,7 +53,7 @@ h3 { font-size: 1.2rem; }
 .subtext {
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 500;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   color: var(--light-gray);
 }
 .blue {
@@ -76,7 +79,7 @@ button {
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 
   color: var(--white);
-  transition: background-color 200ms;
+  transition: background-color 100ms;
 }
 button.delete {
   background-color: var(--light-gray);
@@ -139,11 +142,11 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--light-gray);
-  box-shadow: 0 0 8px rgba(0,0,0,0.2) inset;
+  background-color: var(--white);
+  box-shadow: var(--inner-shadow);
   border-radius: 16px;
   overflow: hidden;
-  transition: background-color 200ms;
+  transition: background-color 100ms;
 }
 .switch-slider:before { /* slider-thumb */
   position: absolute;
@@ -154,11 +157,11 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
   left: 4px;
   bottom: 4px;
   background-color: var(--white);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-  transition: transform 200ms;
+  box-shadow: var(--switch-shadow);
+  transition: transform 100ms;
 }
 .toggle-switch input:checked + .switch-slider {
-  background-color: var(--blue);
+  background-color: var(--blue-highlight);
 }
 
 .toggle-switch input:focus-visible + .switch-slider {
@@ -213,20 +216,21 @@ ul { /* used for site lists */
   display: flex;
   flex-direction: column;
   padding: 2rem;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 /* individual sections */
 .dash-section {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 0.5rem;
-  margin: 1rem 0;
 }
 .dash-section p {
   margin: 0.5rem 0 0.5rem 1rem;
 }
 .section-title {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 1rem;
 }
@@ -289,6 +293,76 @@ select { /* time limit selectors */
 /* peek mode section */
 .peek-wrap {
   margin-left: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* schedule section */
+
+.schedule-row {
+  margin-left: 1rem;
+  display: flex;
+  gap: 1rem;
+}
+.schedule-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.day-toggles {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 8px;
+  height: 24px;
+  background-color: var(--white);
+  overflow: hidden;
+  box-shadow: var(--inner-shadow);
+}
+
+.day-toggles > label {
+  display: flex;
+  height: 24px;
+}
+.day-toggles > label input[type="checkbox"] { /* hide checkbox */
+  width: 0;
+  height: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+}
+.day-toggles > label span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 24px;
+  background-color: var(--white);
+  box-shadow: var(--switch-shadow);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: 
+    background-color 100ms,
+    box-shadow 100ms,
+    color 100ms;
+}
+.day-toggles > label input:checked + span {
+  background-color: var(--blue-highlight);
+  color: var(--white);
+  box-shadow: var(--inner-shadow);
+}
+
+.day-toggles > label input:focus-visible + span {
+  outline: 1px solid black;
+}
+
+.times-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /*************************/

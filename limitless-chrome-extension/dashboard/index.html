@@ -35,7 +35,7 @@
             <h3 class="blue">Website Limits</h3>
             <div class="line"></div>
           </div>
-          <p class="subtext">Pin the extension to the toolbar to see a live timer.</p>
+          <p class="subtext">Configure settings by website.</p>
           <div class="list-headers">
             <span class="site-name subtext blue">Website</span>
             <span class="limit-text subtext blue">Daily Limit</span>
@@ -50,9 +50,9 @@
             <h3 class="blue">Peek Mode Duration</h3>
             <div class="line"></div>
           </div>
-          <p class="subtext">Peek Mode allows you to briefly see a website's contents before the limit activates.</p>
+          <p class="subtext">Peek Mode allows you to briefly visit blocked websites to get the info you need without losing focus.</p>
           <div class="peek-wrap">
-            <label for="peek-time" class="base-text">Duration:</label>
+            <label for="peek-time" class="base-text">Duration</label>
             <select id="peek-time" class="base-text">
               <option value="0.25">15 sec</option>
               <option value="0.5">30 sec</option>
@@ -62,6 +62,54 @@
           </div>
         </div>
 
+        <div class="dash-section">
+          <div class="section-title">
+            <h3 class="blue">Schedule</h3>
+            <div class="line"></div>
+          </div>
+          <p class="subtext">Set a schedule for when your limits are active.</p>
+          
+          <div class="schedule-row">
+            <div class="schedule-col">
+              <span class="subtext blue">All Week</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="all-week-toggle">
+                <span class="switch-slider"></span> 
+              </label>
+            </div>
+            <div class="schedule-col">
+              <span class="subtext blue">Select Days</span>
+              <div class="day-toggles">
+                <label><input type="checkbox" id="day-sun" class="day-checkbox" value="0"><span class="base-text">Sun</span></label>
+                <label><input type="checkbox" id="day-mon" class="day-checkbox" value="1"><span class="base-text">Mon</span></label>
+                <label><input type="checkbox" id="day-tue" class="day-checkbox" value="2"><span class="base-text">Tue</span></label>
+                <label><input type="checkbox" id="day-wed" class="day-checkbox" value="3"><span class="base-text">Wed</span></label>
+                <label><input type="checkbox" id="day-thu" class="day-checkbox" value="4"><span class="base-text">Thu</span></label>
+                <label><input type="checkbox" id="day-fri" class="day-checkbox" value="5"><span class="base-text">Fri</span></label>
+                <label><input type="checkbox" id="day-sat" class="day-checkbox" value="6"><span class="base-text">Sat</span></label>
+              </div>
+            </div>
+          </div>
+
+          <div class="schedule-row">
+            <div class="schedule-col">
+              <span class="subtext blue">All Day</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="all-day-toggle">
+                <span class="switch-slider"></span> 
+              </label>
+            </div>
+            <div class="schedule-col">
+              <span class="subtext blue">Select Times</span>
+              <div class="times-wrap">
+                <span class="base-text">From</span>
+                <select id="start-time" class="base-text"></select>
+                <span class="base-text">To</span>
+                <select id="end-time" class="base-text"></select>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 

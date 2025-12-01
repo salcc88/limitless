@@ -7,6 +7,39 @@ document.addEventListener("DOMContentLoaded", () => {
     let websites = [];
     let peekDuration = 0.5; // default 30 seconds
 
+    // Construct start and end time selects
+    const startSelect = document.getElementById("start-time");
+    const endSelect = document.getElementById("end-time");
+
+    function generateTimeOptions(selectElement) {
+      for (let hour = 0; hour < 24; hour++) {
+        for (let min = 0; min < 60; min += 30) {
+          // Format value as 24-hour string for storage
+          const hh24 = hour.toString().padStart(2, "0");
+          const mm = min.toString().padStart(2, "0");
+          const value = `${hh24}:${mm}`;
+        
+          // Format label as 12-hour for display
+          let hh12 = hour % 12;
+          if (hh12 === 0) hh12 = 12;
+          const period = hour < 12 ? "AM" : "PM";
+          const label = `${hh12}:${mm} ${period}`;
+        
+          const option = document.createElement("option");
+          option.value = value;      // keep 24-hour format for storage
+          option.textContent = label; // show 12-hour format to user
+          selectElement.appendChild(option);
+        }
+      }
+    }
+
+    generateTimeOptions(startSelect);
+    generateTimeOptions(endSelect);
+
+    // Optional: set default values
+    startSelect.value = "09:00";
+    endSelect.value = "17:30";
+
     function loadAll() {
       chrome.storage.local.get(["websites", "peekDuration"], (data) => {
         websites = Array.isArray(data.websites) ? data.websites : [];
