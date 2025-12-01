@@ -1,4 +1,6 @@
-// Service worker for Limitless Extension
+// Limitless Extension
+// Copyright 2025 Sal Costa
+// https://salcosta.dev
 
 // In-memory maps
 const activeTabTimes = {}; // last timestamp per active tab
