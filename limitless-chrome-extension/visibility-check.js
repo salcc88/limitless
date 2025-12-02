@@ -6,7 +6,6 @@ function reportVisibility() {
       visible: document.visibilityState === "visible"
     });
   } catch (e) {
-    // console.warn("Failed to send visibility message:", e);
   }
 }
 

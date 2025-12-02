@@ -113,7 +113,6 @@ async function trackUsage(tabId, url, storageData) {
 
     chrome.storage.local.set({ websites });
   } catch (err) {
-    console.error("Failed to get tab in trackUsage:", err);
   }
 }
 
@@ -273,7 +272,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       await trackUsage(tabId, tab.url, storageData);
     } 
   } catch (err) {
-    console.error("Error in onUpdated listener:", err);
   }
 });
 
@@ -286,7 +284,6 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
     await checkAndBlock(tab.id, tab.url, storageData);
     await updateBadge(tab.url, storageData);
   } catch (err) {
-    console.error("Error in onActivated listener:", err);
   }
 });
 
@@ -370,7 +367,6 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       await checkAndBlock(tabId, url, storageData);
       await updateBadge(url, storageData);
     } catch (err) {
-      console.error("Error in updateBadge alarm:", err);
     }
   } else if (alarm.name === "midnightReset") {
     resetDailyUsage();
