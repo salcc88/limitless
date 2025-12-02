@@ -1,13 +1,14 @@
 @font-face {
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: "Plus Jakarta Sans";
   src: url(/assets/font/plus-jakarta-sans-500.woff2) format("woff2");
   font-optical-sizing: auto;
   font-weight: 500;
   font-style: normal;
+  font-display: swap;
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light dark; /* for bg change */
 
   --blue: #3BC4AB;
   --blue-highlight: #43DABE;
@@ -40,9 +41,11 @@ body {
   margin: 0;
 }
 
-h1, h2, h3 { 
+h1, h2, h3, .base-text, .subtext, button, input {
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 500;
+}
+h1, h2, h3 { 
   margin: 0;
   color: var(--gray);
 }
@@ -51,14 +54,10 @@ h2 { font-size: 2rem; }
 h3 { font-size: 1.2rem; }
 
 .base-text {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 500;
   font-size: 1rem;
   color: var(--gray);
 }
 .subtext {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 500;
   font-size: 0.9rem;
   color: var(--light-gray);
 }
@@ -91,8 +90,6 @@ button {
   border-radius: 8px;
   border: none;
   cursor: pointer;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 500;
   font-size: 1rem;
   background-color: var(--blue);
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
@@ -119,8 +116,6 @@ button:disabled {
 
 input[type="text"] { /* new website input box */
   height: 30px;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 500;
   font-size: 1rem;
   width: 200px;
   padding: 0 0.5rem;
