@@ -263,7 +263,7 @@ ul { /* used for site lists */
   background-color: var(--blue);
 }
 p.section-desc {
-  margin: 0.5rem 0 0.5rem 1rem;
+  margin: 0.5rem 0 1rem 1rem;
 }
 
 .flexrow-tight { /* add new section, peek mode wrappers */
