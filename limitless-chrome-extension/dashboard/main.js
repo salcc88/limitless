@@ -115,12 +115,21 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         for (const [key, defaultValue] of Object.entries(defaults)) {
+          const value = (typeof data[key] === "undefined") ? defaultValue : data[key];
+
+          // write default to storage if missing
           if (typeof data[key] === "undefined") {
             chrome.storage.local.set({ [key]: defaultValue });
-            window[key] = defaultValue;
-          } else {
-            window[key] = data[key];
           }
+        
+          // assign to the actual variables your UI reads
+          if (key === "peekDuration") { peekDuration = value; } 
+          else if (key === "allWeek") { allWeek = value; } 
+          else if (key === "allDay") { allDay = value; } 
+          else if (key === "weekSchedule") { weekScheduleMask = value; } 
+          else if (key === "scheduleStart") { scheduleStart = value; } 
+          else if (key === "scheduleEnd") { scheduleEnd = value; } 
+          else if (key === "disableAll") { disableAll = value; }
         }
 
         //Set ui values

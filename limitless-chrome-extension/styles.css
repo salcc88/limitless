@@ -17,6 +17,8 @@
   --light-gray: #939393;
   --white: #FFFFFF;
 
+  --duration: 150ms;
+
   --inner-shadow: 0 2px 12px rgba(0,0,0,0.3) inset;
   --switch-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
@@ -69,7 +71,7 @@ h3 { font-size: 1.2rem; }
 .killswitch-can-disable,
 .all-week-can-disable,
 .all-day-can-disable {
-  transition: opacity 100ms;
+  transition: opacity var(--duration);
 }
 .disabled {
   opacity: 0.2;
@@ -96,7 +98,7 @@ button {
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   flex-shrink: 0;
   color: var(--white);
-  transition: background-color 100ms;
+  transition: background-color var(--duration);
 }
 button.delete {
   background-color: var(--light-gray);
@@ -163,7 +165,7 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
   box-shadow: var(--inner-shadow);
   border-radius: 16px;
   overflow: hidden;
-  transition: background-color 100ms;
+  transition: background-color var(--duration);
 }
 .switch-slider:before { /* slider-thumb */
   position: absolute;
@@ -175,7 +177,7 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
   bottom: 4px;
   background-color: var(--white);
   box-shadow: var(--switch-shadow);
-  transition: transform 100ms;
+  transition: transform var(--duration);
 }
 .toggle-switch input:checked + .switch-slider {
   background-color: var(--blue-highlight);
@@ -187,8 +189,9 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
 .toggle-switch input:focus-visible + .switch-slider {
   outline: 1px solid black;
 }
-.toggle-switch input:focus-visible + .switch-slider:before {
-  transform: translateX(4px);
+.toggle-switch input:focus-visible + .switch-slider:before,
+.toggle-switch:hover .switch-slider:before {
+  transform: translateX(3px);
 }
 
 .toggle-switch input:checked + .switch-slider:before {
@@ -363,9 +366,10 @@ select { /* time limit selectors */
   border-radius: 5px;
   cursor: pointer;
   transition: 
-    background-color 100ms,
-    box-shadow 100ms,
-    color 100ms;
+    background-color var(--duration),
+    box-shadow var(--duration),
+    opacity var(--duration),
+    color var(--duration);
 }
 .day-toggles > label input:checked + span {
   background-color: var(--blue-highlight);
@@ -375,6 +379,10 @@ select { /* time limit selectors */
 
 .day-toggles > label input:focus-visible + span {
   outline: 1px solid black;
+}
+.day-toggles > label input:focus-visible + span,
+.day-toggles > label input:hover + span {
+  opacity: 0.8;
 }
 
 footer {
