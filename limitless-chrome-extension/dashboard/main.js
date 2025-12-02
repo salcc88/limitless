@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const endSelect = document.getElementById("end-time");
 
     let websites = [];
-    let peekDuration = 0.5; // default 30 seconds
+    let peekDuration = 0.25; // default 15 seconds
     let weekScheduleMask = 0b0000000;
     let allWeek = true;
     let allDay = true
@@ -25,7 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let disableAll = false
 
     // Construct start and end time selects
-    function generateTimeOptions(selectElement) {
+    function generateTimeOptions(startSelect, endSelect) {
+      const fragment = document.createDocumentFragment();
+
       for (let hour = 0; hour < 24; hour++) {
         for (let min = 0; min < 60; min += 30) {
           // Format value as 24-hour string for storage
@@ -40,14 +42,17 @@ document.addEventListener("DOMContentLoaded", () => {
           const label = `${hour12}:${mm} ${period}`;
         
           const option = document.createElement("option");
-          option.value = value;      // keep 24-hour format for storage
-          option.textContent = label; // show 12-hour format to user
-          selectElement.appendChild(option);
+          option.value = value;
+          option.textContent = label;
+        
+          fragment.appendChild(option);
         }
       }
+    
+      startSelect.appendChild(fragment.cloneNode(true));
+      endSelect.appendChild(fragment.cloneNode(true));
     }
-    generateTimeOptions(startSelect);
-    generateTimeOptions(endSelect);
+    generateTimeOptions(startSelect, endSelect);
 
     // week schedule helpers
     function getWeekScheduleMask() {
@@ -97,24 +102,26 @@ document.addEventListener("DOMContentLoaded", () => {
         "disableAll",
       ], (data) => {
 
-        function loadDataAndCheck( key, defaultValue ) {
-          const storageValue = data[key];
-          if (typeof storageValue === 'undefined') {
-            chrome.storage.local.set({ [key]: defaultValue });
-            return defaultValue;
-          }
-          return storageValue;
-        }
-
         // initialize to defaults if not found
         websites = Array.isArray(data.websites) ? data.websites : [];
-        peekDuration = Number(loadDataAndCheck("peekDuration", 0.5));
-        allWeek = loadDataAndCheck("allWeek", true);
-        allDay = loadDataAndCheck("allDay", true);
-        weekScheduleMask = Number(loadDataAndCheck("weekSchedule", 0b0000000));
-        scheduleStart = String(loadDataAndCheck("scheduleStart", "09:00"));
-        scheduleEnd = String(loadDataAndCheck("scheduleEnd", "17:30"));
-        disableAll = loadDataAndCheck("disableAll", false);
+        const defaults = {
+          peekDuration: 0.25,
+          allWeek: true,
+          allDay: true,
+          weekSchedule: 0b0000000,
+          scheduleStart: "09:00",
+          scheduleEnd: "17:30",
+          disableAll: false,
+        };
+
+        for (const [key, defaultValue] of Object.entries(defaults)) {
+          if (typeof data[key] === "undefined") {
+            chrome.storage.local.set({ [key]: defaultValue });
+            window[key] = defaultValue;
+          } else {
+            window[key] = data[key];
+          }
+        }
 
         //Set ui values
         allWeekToggle.checked = allWeek;
@@ -151,88 +158,113 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function renderSites() {
       siteList.innerHTML = "";
+      const fragment = document.createDocumentFragment();
 
-      if (websites.length === 0) {
+      if (!websites || websites.length === 0) {
         const li = document.createElement("li");
         li.classList.add("subtext");
         li.textContent = "No limits set.";
         siteList.appendChild(li);
-        return;
+      } else {
+        websites.forEach((site, index) => {
+          const li = document.createElement("li");
+          li.dataset.index = String(index);
+
+          const domainSpan = document.createElement("span"); // website name
+          domainSpan.textContent = site.domain;
+          domainSpan.classList.add("site-name", "base-text");
+
+          const timeSelect = document.createElement("select"); // time limit
+          timeSelect.id = "time-select" + index;
+          timeSelect.classList.add("base-text");
+          timeSelect.dataset.type = "timeSelect";
+
+          for (let i = 0; i <= 180; i += 5) { // Add timer options, 0 to 180 minutes
+            const option = document.createElement("option");
+            option.value = String(i);
+            option.textContent = i + " min";
+            if (String(i) === String(site.timeLimit || 0)) option.selected = true;
+            timeSelect.appendChild(option);
+          }
+
+          // Construct toggle switch checkbox
+          const toggleWrapper = document.createElement("label");
+          toggleWrapper.classList.add("toggle-switch");
+
+          const peekCheckbox = document.createElement("input");
+          peekCheckbox.type = "checkbox";
+          peekCheckbox.id = "peek-check" + index;
+          peekCheckbox.checked = !!site.peekMode;
+          peekCheckbox.dataset.type = "peekCheckbox";
+
+          const sliderSpan = document.createElement("span");
+          sliderSpan.classList.add("switch-slider");
+
+          toggleWrapper.append(peekCheckbox, sliderSpan);
+
+          // delete button
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "Delete";
+          deleteBtn.classList.add("delete");
+
+          const timeLeftSpan = document.createElement("span"); // time left display
+          timeLeftSpan.classList.add("time-left", "subtext");
+          timeLeftSpan.dataset.type = "timeLeft";
+
+          const usage = Number(site.usage || 0);
+          const timeLimit = Number(site.timeLimit || 0);
+          const remaining = Math.floor(Math.max(timeLimit - usage, 0));
+          timeLeftSpan.textContent = `${remaining} min`;
+
+          li.append(domainSpan, timeSelect, toggleWrapper, timeLeftSpan, deleteBtn);
+          fragment.appendChild(li);
+        });
       }
 
-      websites.forEach((site, index) => {
-        const li = document.createElement("li");
-
-        const domainSpan = document.createElement("span"); // website name
-        domainSpan.textContent = site.domain;
-        domainSpan.classList.add("site-name", "base-text");
-
-        const timeSelect = document.createElement("select"); // time limit
-        timeSelect.id = "time-select" + index;
-        timeSelect.classList.add("base-text");
-
-        for (let i = 0; i <= 180; i += 5) { // Add timer options, 0 to 180 minutes
-          const option = document.createElement("option");
-          option.value = String(i);
-          option.textContent = i + " min";
-          if (i === (site.timeLimit || 0)) option.selected = true;
-          timeSelect.appendChild(option);
-        }
-
-        // Construct toggle switch checkbox
-        const toggleWrapper = document.createElement("label");
-        toggleWrapper.classList.add("toggle-switch");
-
-        const peekCheckbox = document.createElement("input");
-        peekCheckbox.type = "checkbox";
-        peekCheckbox.id = "peek-check" + index;
-        peekCheckbox.checked = !!site.peekMode;
-
-        const sliderSpan = document.createElement("span");
-        sliderSpan.classList.add("switch-slider");
-
-        toggleWrapper.append(peekCheckbox, sliderSpan);
-
-        // delete button
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Delete";
-        deleteBtn.classList.add("delete");
-        deleteBtn.dataset.index = String(index);
-
-        const timeLeftSpan = document.createElement("span"); // time left display
-        timeLeftSpan.dataset.index = String(index);
-        timeLeftSpan.classList.add("time-left", "subtext");
-
-        li.append(domainSpan, timeSelect, toggleWrapper, timeLeftSpan, deleteBtn);
-        siteList.appendChild(li);
-
-        function updateTimeLeft() {
-          const timeLeft = Math.max((site.timeLimit || 0) - (site.usage || 0), 0);
-          timeLeftSpan.textContent = `${timeLeft > 1 ? Math.floor(timeLeft) : 0} min`;
-        }
-
-        updateTimeLeft();
-
-        timeSelect.addEventListener("change", () => { // save and update timer when limit is changed
-          site.timeLimit = Number(timeSelect.value);
-          saveWebsites();
-          updateTimeLeft();
-        });
-
-        peekCheckbox.addEventListener("change", () => { // update peek mode
-          site.peekMode = peekCheckbox.checked;
-          saveWebsites();
-        });
-
-        deleteBtn.addEventListener("click", () => {
-          const confirmed = confirm(`Are you sure you want to remove the limit for ${site.domain}?`);
-          if (!confirmed) return; // user canceled
-          websites.splice(index, 1);
-          saveWebsites();
-          renderSites();
-        });
-      });
+      siteList.appendChild(fragment);
     }
+
+    siteList.addEventListener("change", (e) => { // event listeners for config changes
+      const li = e.target.closest("li");
+      if (!li) return;
+      const index = Number(li.dataset.index);
+      const site = websites[index];
+      if (!site) return;
+
+      if (e.target.matches('select') && e.target.dataset.type === "timeSelect") {
+        site.timeLimit = Number(e.target.value);
+        saveWebsites();
+        const timeSpan = li.querySelector('[data-type="timeLeft"]');
+        if (timeSpan) {
+          const usage = Number(site.usage || 0);
+          const remaining = Math.floor(Math.max(site.timeLimit - usage, 0));
+          timeSpan.textContent = `${remaining} min`;
+        }
+        return;
+      }
+    
+      if (e.target.matches('input[type="checkbox"]') && e.target.dataset.type === "peekCheckbox") {
+        site.peekMode = !!e.target.checked;
+        saveWebsites();
+        return
+      }
+    });
+
+    siteList.addEventListener("click", (e) => {
+      if (!e.target.matches('button.delete')) return;
+      const li = e.target.closest("li");
+      if (!li) return;
+      const index = Number(li.dataset.index);
+      const site = websites[index];
+      if (!site) return;
+
+      const confirmed = confirm(`Are you sure you want to remove the limit for ${site.domain}?`);
+      if (!confirmed) return;
+        
+      websites.splice(index, 1);
+      saveWebsites();
+      renderSites();
+    });
 
     // input listeners
 
@@ -259,7 +291,7 @@ document.addEventListener("DOMContentLoaded", () => {
         domain: cleanedInput, 
         timeLimit: 60, 
         peekMode: false,
-        usage: 0 
+        usage: 0
       });
       saveWebsites();
       renderSites();

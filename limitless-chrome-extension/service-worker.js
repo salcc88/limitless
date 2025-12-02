@@ -6,8 +6,8 @@
 const activeTabTimes = {}; // last timestamp per active tab
 const tabVisibility = {}; // visibility state per tabId
 const peekStartTimes = {}; // key: tabId, value: timestamp when peek started
-const notifiedThresholds = {}; // Tracks if user has been notified for 10, 5, 1 min left
 const peekNotified = {}; // Tracks if user has been notified about peek mode per tabId
+const notificationsSent = {};
 
 const blueColor = "#75f8e0";
 const orangeColor = "#FFC66B";
@@ -107,6 +107,7 @@ async function trackUsage(tabId, url, storageData) {
     const now = Date.now();
     const lastTime = activeTabTimes[tabId] || now;
     const diffMinutes = (now - lastTime) / 1000 / 60;
+
     site.usage = (site.usage || 0) + diffMinutes;
     activeTabTimes[tabId] = now;
 
@@ -132,19 +133,20 @@ async function updateBadge(url, storageData) {
 
   const timeLeft = calculateTimeLeft(site);
 
-  const siteKey = site.domain;
-  if (!notifiedThresholds[siteKey]) {
-    notifiedThresholds[siteKey] = { 10: false, 5: false, 1: false };
+  // Initialize in-memory map for this site if needed
+  if (!notificationsSent[normalizedFullPath]) {
+    notificationsSent[normalizedFullPath] = {10: false, 5: false, 1: false};
   }
 
-  [10, 5, 1].forEach(threshold => { // Send notifications for 10, 5, 1 minute left
+  // Send notifications if thresholds are crossed downward
+  [10, 5, 1].forEach(threshold => {
     if (
       timeLeft <= threshold &&
-      !notifiedThresholds[siteKey][threshold] &&
+      !notificationsSent[normalizedFullPath][threshold] &&
       timeLeft > threshold - 1
     ) {
-      sendTimeLeftNotification(siteKey, threshold);
-      notifiedThresholds[siteKey][threshold] = true;
+      sendTimeLeftNotification(site.domain, threshold);
+      notificationsSent[normalizedFullPath][threshold] = true;
     }
   });
 
@@ -178,7 +180,7 @@ async function checkAndBlock(tabId, url, storageData) {
   if (!site) return;
 
   const timeLeft = calculateTimeLeft(site);
-  const peekDuration = storageData.peekDuration || 0.5; // minutes
+  const peekDuration = storageData.peekDuration || 0.25; // minutes
 
   if (timeLeft > 0) return;
 
@@ -226,19 +228,18 @@ async function resetDailyUsage() {
 
   if (storageData.lastReset !== today) {
     const websites = storageData.websites || [];
-    const resetWebsites = websites.map(site => ({ ...site, usage: 0 }));
+    const resetWebsites = websites.map(site => ({ 
+      ...site, 
+      usage: 0
+    }));
 
     await new Promise((resolve) =>
-      chrome.storage.local.set(
-        { websites: resetWebsites, lastReset: today },
-        resolve
-      )
+      chrome.storage.local.set({ websites: resetWebsites, lastReset: today }, resolve)
     );
 
-    // Reset notification thresholds
-    for (const domain in notifiedThresholds) {
-      notifiedThresholds[domain] = { 10: false, 5: false, 1: false };
-    }
+    Object.keys(notificationsSent).forEach(key => {
+      notificationsSent[key] = { 10: false, 5: false, 1: false };
+    });
     
     // Refresh badge for active tab if necessary
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -265,10 +266,8 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   try {
     const storageData = await getStorage(["websites", "peekDuration"]);
 
-    await Promise.all([ // update badge and check for block immediately
-      checkAndBlock(tabId, tab.url, storageData),
-      updateBadge(tab.url, storageData)
-    ]);
+    await checkAndBlock(tabId, tab.url, storageData),
+    await updateBadge(tab.url, storageData)
 
     if (changeInfo.status === "complete") { // track usage once page loads
       await trackUsage(tabId, tab.url, storageData);
@@ -283,11 +282,9 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
     const tab = await chrome.tabs.get(activeInfo.tabId);
     if (!tab.url) return;
     const storageData = await getStorage(["websites", "peekDuration"]);
-    await Promise.all([
-      checkAndBlock(tab.id, tab.url, storageData),
-      updateBadge(tab.url, storageData),
-      trackUsage(tab.id, tab.url, storageData)
-    ]);
+    await trackUsage(tab.id, tab.url, storageData);
+    await checkAndBlock(tab.id, tab.url, storageData);
+    await updateBadge(tab.url, storageData);
   } catch (err) {
     console.error("Error in onActivated listener:", err);
   }
@@ -302,9 +299,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 // send disabled status to popup and listen for visiblity messages
-chrome.runtime.onMessage.addListener((msg, sender, respond) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "CHECK_DISABLED") {
-    checkIfDisabled().then(disabled => respond({ disabled }));
+    checkIfDisabled().then(disabled => sendResponse({ disabled }));
     return true;
   }
 
@@ -318,13 +315,13 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
     chrome.storage.local.get(["websites"], (data) => {
       let websites = data.websites || [];
       const site = websites.find(w => w.domain === msg.domain);
-      respond(site ? calculateTimeLeft(site) : 0);
+      sendResponse(site ? calculateTimeLeft(site) : 0);
     });
     return true;
   }
 
   if (msg.type === "getWebsites") {
-    chrome.storage.local.get(["websites"], (data) => respond(data.websites || []));
+    chrome.storage.local.get(["websites"], (data) => sendResponse(data.websites || []));
     return true;
   }
 
@@ -369,11 +366,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       const url = tabs[0].url;
 
       const storageData = await getStorage(["websites", "peekDuration"]);
-      await Promise.all([
-        checkAndBlock(tabId, url, storageData),
-        updateBadge(url, storageData),
-        trackUsage(tabId, url, storageData)
-      ]);
+      await trackUsage(tabId, url, storageData);
+      await checkAndBlock(tabId, url, storageData);
+      await updateBadge(url, storageData);
     } catch (err) {
       console.error("Error in updateBadge alarm:", err);
     }
