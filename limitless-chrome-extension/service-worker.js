@@ -36,7 +36,8 @@ async function checkIfDisabled( { notifyTimer = true } = {}) {
   ]);
 
   if (data.disableAll) { // Kill switch active
-    if (notifyTimer) sendIsDisabledToTimer(true, data.showTimer);
+    //TIMER DEBUG
+    //if (notifyTimer) sendIsDisabledToTimer(true, data.showTimer);
     return true; 
   }
 
@@ -56,8 +57,9 @@ async function checkIfDisabled( { notifyTimer = true } = {}) {
     isTimeAllowed = currentTime >= start && currentTime <= end;
   }
 
-  const isDisabled = !(isDayAllowed && isTimeAllowed);
-  if (notifyTimer) sendIsDisabledToTimer(isDisabled, data.showTimer);
+  let isDisabled = !(isDayAllowed && isTimeAllowed);
+  //TIMER DEBUG
+  //if (notifyTimer) sendIsDisabledToTimer(isDisabled, data.showTimer);
   return isDisabled;
 }
 
@@ -105,35 +107,36 @@ function sendTimeLeftNotification(domain, minutesLeft) {
 }
 
 // floating timer messaging
-function sendTimeLeftToTimer(domain, timeLeft) {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (!tabs[0] || !tabs[0].url.startsWith("http")) return;
-
-    chrome.tabs.sendMessage(tabs[0].id, { type: "timerUpdateTime", domain, timeLeft }, () => {
-      if (chrome.runtime.lastError) {
-        console.error("sendMessage failed:", chrome.runtime.lastError.message);
-      } else {
-        console.log("sendTimeLeftToTimer sent", domain, timeLeft);
-      }
-    });
-  });
-}
-
-function sendIsDisabledToTimer(disabled, showTimer) {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (!tabs[0] || !tabs[0].url.startsWith("http")) return;
-
-    chrome.tabs.sendMessage(tabs[0].id, { 
-      type: "timerUpdateDisabled", 
-      disabled, 
-      showTimer 
-    }, () => {
-      if (chrome.runtime.lastError) {
-        console.log("Pre-existing tabs could not be injected. Re-open these tabs to start using timers.");
-      }
-    });
-  });
-}
+//TIMER DEBUG
+// function sendTimeLeftToTimer(domain, timeLeft) {
+//   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+//     if (!tabs[0] || !tabs[0].url.startsWith("http")) return;
+// 
+//     chrome.tabs.sendMessage(tabs[0].id, { type: "timerUpdateTime", domain, timeLeft }, () => {
+//       if (chrome.runtime.lastError) {
+//         console.error("sendMessage failed:", chrome.runtime.lastError.message);
+//       } else {
+//         console.log("sendTimeLeftToTimer sent", domain, timeLeft);
+//       }
+//     });
+//   });
+// }
+// 
+// function sendIsDisabledToTimer(disabled, showTimer) {
+//   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+//     if (!tabs[0] || !tabs[0].url.startsWith("http")) return;
+// 
+//     chrome.tabs.sendMessage(tabs[0].id, { 
+//       type: "timerUpdateDisabled", 
+//       disabled, 
+//       showTimer 
+//     }, () => {
+//       if (chrome.runtime.lastError) {
+//         console.log("Pre-existing tabs could not be injected. Re-open these tabs to start using timers.");
+//       }
+//     });
+//   });
+// }
 
 
 // Track usage only for the tab if it's visible
@@ -201,7 +204,8 @@ async function updateBadge(url, storageData) {
 
   chrome.action.setBadgeText({ text });
   chrome.action.setBadgeBackgroundColor({ color });
-  sendTimeLeftToTimer(site.domain, text);
+  //TIMER DEBUG
+  // sendTimeLeftToTimer(site.domain, text);
 }
 
 // Block a website if limit reached
@@ -326,41 +330,18 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // send disabled status to popup and listen for visiblity messages
 chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
-  if (msg.type === "settingsUpdated") {
-    const storageData = await getStorage(["websites"]);
-    initializeNotificationMap(storageData.websites || []);
-    await coreOperations();
-    return false; 
-  }
-  if (msg.type === "checkStatusForPopup") {
-    checkIfDisabled({ notifyTimer: false })
-      .then(disabled => sendResponse({ disabled }))
-      .catch(err => {
-        console.error(err);
-        sendResponse({ disabled: true });
-      });
-    return true; // keep message channel open
-  }
+  // TIMER DEBUG
+  // if (msg.type === "settingsUpdated") {
+  //   const storageData = await getStorage(["websites"]);
+  //   initializeNotificationMap(storageData.websites || []);
+  //   await coreOperations();
+  //   return false; 
+  // }
   if (msg.type === "tabVisibility" && sender.tab) {
     tabVisibility[sender.tab.id] = !!msg.visible;
     activeTabTimes[sender.tab.id] = Date.now(); // reset last active time
     return false;
   }
-
-  if (msg.type === "getTimeLeft" && msg.domain) {
-    chrome.storage.local.get(["websites"], (data) => {
-      let websites = data.websites || [];
-      const site = websites.find(w => w.domain === msg.domain);
-      sendResponse(site ? calculateTimeLeft(site) : 0);
-    });
-    return true;
-  }
-
-  if (msg.type === "getWebsites") {
-    chrome.storage.local.get(["websites"], (data) => sendResponse(data.websites || []));
-    return true;
-  }
-
 });
 
 // Periodic badge updates for active tab
@@ -393,6 +374,17 @@ chrome.runtime.onStartup.addListener( async () => {
   const storageData = await getStorage(["websites"]);
   initializeNotificationMap(storageData.websites || []);
 });
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "popup") {
+    (async () => {
+      // Get the latest status right when the popup connects
+      const status = await checkIfDisabled({ notifyTimer: false });
+      port.postMessage({ type: "updateStatusInPopup", disabledStatus: status });
+    })();
+  }
+});
+
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === "updateAll") {

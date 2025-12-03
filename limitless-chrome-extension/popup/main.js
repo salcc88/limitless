@@ -1,15 +1,14 @@
 const configureBtn = document.getElementById("configure-btn");
+const statusSpan = document.getElementById("status");
 
-// ask for disabled status
-chrome.runtime.sendMessage({ type: "checkStatusForPopup" }, (res) => {
-  if (chrome.runtime.lastError) {
-    console.warn("Popup closed before response:", chrome.runtime.lastError.message);
-    return;
+// Connect to the service worker
+const port = chrome.runtime.connect({ name: "popup" });
+
+port.onMessage.addListener((msg) => {
+  if (msg.type === "updateStatusInPopup") {
+    statusSpan.textContent = msg.disabledStatus ? 'Inactive' : 'Active';
+    statusSpan.classList.toggle('off', msg.disabledStatus);
   }
-  const disabled = res?.disabled;
-  const statusSpan = document.getElementById("status");
-  statusSpan.textContent = disabled ? 'Inactive' : 'Active';
-  statusSpan.classList.toggle('off', disabled);
 });
 
 // Open dashboard
