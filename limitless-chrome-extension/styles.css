@@ -1,13 +1,14 @@
 @font-face {
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: "Plus Jakarta Sans";
   src: url(/assets/font/plus-jakarta-sans-500.woff2) format("woff2");
   font-optical-sizing: auto;
   font-weight: 500;
   font-style: normal;
+  font-display: swap;
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light dark; /* for bg change */
 
   --blue: #3BC4AB;
   --blue-highlight: #43DABE;
@@ -16,6 +17,8 @@
   --gray: #1D1D1D;
   --light-gray: #939393;
   --white: #FFFFFF;
+
+  --duration: 150ms;
 
   --inner-shadow: 0 2px 12px rgba(0,0,0,0.3) inset;
   --switch-shadow: 0 2px 6px rgba(0,0,0,0.3);
@@ -38,9 +41,11 @@ body {
   margin: 0;
 }
 
-h1, h2, h3 { 
+h1, h2, h3, .base-text, .subtext, button, input {
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 500;
+}
+h1, h2, h3 { 
   margin: 0;
   color: var(--gray);
 }
@@ -49,14 +54,10 @@ h2 { font-size: 2rem; }
 h3 { font-size: 1.2rem; }
 
 .base-text {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 500;
   font-size: 1rem;
   color: var(--gray);
 }
 .subtext {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 500;
   font-size: 0.9rem;
   color: var(--light-gray);
 }
@@ -69,7 +70,7 @@ h3 { font-size: 1.2rem; }
 .killswitch-can-disable,
 .all-week-can-disable,
 .all-day-can-disable {
-  transition: opacity 100ms;
+  transition: opacity var(--duration);
 }
 .disabled {
   opacity: 0.2;
@@ -89,14 +90,12 @@ button {
   border-radius: 8px;
   border: none;
   cursor: pointer;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 500;
   font-size: 1rem;
   background-color: var(--blue);
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   flex-shrink: 0;
   color: var(--white);
-  transition: background-color 100ms;
+  transition: background-color var(--duration);
 }
 button.delete {
   background-color: var(--light-gray);
@@ -117,8 +116,6 @@ button:disabled {
 
 input[type="text"] { /* new website input box */
   height: 30px;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 500;
   font-size: 1rem;
   width: 200px;
   padding: 0 0.5rem;
@@ -163,7 +160,7 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
   box-shadow: var(--inner-shadow);
   border-radius: 16px;
   overflow: hidden;
-  transition: background-color 100ms;
+  transition: background-color var(--duration);
 }
 .switch-slider:before { /* slider-thumb */
   position: absolute;
@@ -175,7 +172,7 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
   bottom: 4px;
   background-color: var(--white);
   box-shadow: var(--switch-shadow);
-  transition: transform 100ms;
+  transition: transform var(--duration);
 }
 .toggle-switch input:checked + .switch-slider {
   background-color: var(--blue-highlight);
@@ -187,8 +184,9 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
 .toggle-switch input:focus-visible + .switch-slider {
   outline: 1px solid black;
 }
-.toggle-switch input:focus-visible + .switch-slider:before {
-  transform: translateX(4px);
+.toggle-switch input:focus-visible + .switch-slider:before,
+.toggle-switch:hover .switch-slider:before {
+  transform: translateX(3px);
 }
 
 .toggle-switch input:checked + .switch-slider:before {
@@ -226,7 +224,7 @@ ul { /* used for site lists */
   align-items: center;
   justify-content: space-between;
   box-sizing: border-box;
-  padding: 1rem 2rem;
+  padding: 16px 32px;
   background-color: var(--blue);
 }
 .dash-header h2 {
@@ -242,7 +240,7 @@ ul { /* used for site lists */
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  padding: 2rem;
+  padding: 32px;
   gap: 2rem;
 }
 /***********************/
@@ -263,7 +261,7 @@ ul { /* used for site lists */
   background-color: var(--blue);
 }
 p.section-desc {
-  margin: 0.5rem 0 0.5rem 1rem;
+  margin: 0.5rem 0 1rem 1rem;
 }
 
 .flexrow-tight { /* add new section, peek mode wrappers */
@@ -363,9 +361,10 @@ select { /* time limit selectors */
   border-radius: 5px;
   cursor: pointer;
   transition: 
-    background-color 100ms,
-    box-shadow 100ms,
-    color 100ms;
+    background-color var(--duration),
+    box-shadow var(--duration),
+    opacity var(--duration),
+    color var(--duration);
 }
 .day-toggles > label input:checked + span {
   background-color: var(--blue-highlight);
@@ -375,6 +374,10 @@ select { /* time limit selectors */
 
 .day-toggles > label input:focus-visible + span {
   outline: 1px solid black;
+}
+.day-toggles > label input:focus-visible + span,
+.day-toggles > label input:hover + span {
+  opacity: 0.8;
 }
 
 footer {
@@ -388,7 +391,7 @@ footer {
 /*************************/
 
 .popup-header {
-  padding: 0.5rem 1rem;
+  padding: 8px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -400,8 +403,8 @@ footer {
 .popup-content {
   display: flex;
   flex-direction: column;
-  padding: 1rem;
-  gap: 0.5rem;
+  padding: 16px;
+  gap: 16px;
   width: 180px;
   background-color: var(--white);
 }
@@ -413,7 +416,7 @@ footer {
   color: var(--blue);
 }
 #status.off {
-  color: var(--red);
+  color: var(--light-gray);
 }
 
 /*************************/
@@ -429,7 +432,7 @@ footer {
   align-items: center; 
   height: 100vh; 
   background: var(--blue);
-  gap: 1rem;
+  gap: 16px;
 }
 .blocked-wrap svg {
   width: 150px;
@@ -461,8 +464,8 @@ footer {
   }
   .dash-header,
   .dash-content {
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
 @media screen and (max-width: 680px) {

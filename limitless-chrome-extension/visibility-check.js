@@ -2,11 +2,10 @@
 function reportVisibility() {
   try {
     chrome.runtime.sendMessage({
-      type: "tab-visibility",
+      type: "tabVisibility",
       visible: document.visibilityState === "visible"
     });
   } catch (e) {
-    // console.warn("Failed to send visibility message:", e);
   }
 }
 

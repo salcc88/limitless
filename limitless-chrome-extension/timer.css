@@ -1,0 +1,75 @@
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url(../assets/font/plus-jakarta-sans-500.woff2) format("woff2");
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+#timer-box {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  width: 130px;
+  padding: 24px 0px 16px 0px;
+  background-color: rgb(255, 255, 255, 0.9);
+  border: 2px solid #1D1D1D;
+  border-radius: 8px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 2rem;
+  z-index: 999999;
+  pointer-events: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: grab;
+  user-select: none;
+}
+#timer-box:active {
+  cursor: grabbing;
+}
+#timer-box #domain-span { 
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 500;
+  color: #939393;
+  font-size: 0.8rem; 
+}
+#timer-box h2 { 
+  font-size: 2rem;
+  line-height: 2rem;
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 500;
+  color: #939393; /* initial value */
+  animation: flash 300ms ease-out forwards;
+ }
+#timer-box #timer-span { 
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 500;
+  color: #939393;
+  font-size: 1rem; 
+}
+
+
+#timer-box #close-button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 150ms;
+}
+#timer-box #close-button:hover {
+  opacity: 0.5;
+}
+
+@keyframes flash {
+  from { color: #939393 ;}
+  to { color: #1D1D1D; }
+}

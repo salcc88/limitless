@@ -6,10 +6,10 @@
 const activeTabTimes = {}; // last timestamp per active tab
 const tabVisibility = {}; // visibility state per tabId
 const peekStartTimes = {}; // key: tabId, value: timestamp when peek started
-const notifiedThresholds = {}; // Tracks if user has been notified for 10, 5, 1 min left
 const peekNotified = {}; // Tracks if user has been notified about peek mode per tabId
+const notificationsSent = {};
 
-const blueColor = "#43DABE";
+const blueColor = "#75f8e0";
 const orangeColor = "#FFC66B";
 const redColor = "#FF6B6B";
 const grayColor = "#1D1D1D";
@@ -24,28 +24,29 @@ function timeStringToMinutes(str) {
   const [h, m] = str.split(":").map(Number);
   return h * 60 + m;
 }
-async function checkIfDisabled() {
+async function checkIfDisabled( { notifyTimer = true } = {}) {
   const data = await getStorage([
     "disableAll",
     "allWeek",
     "allDay",
     "weekSchedule",
     "scheduleStart",
-    "scheduleEnd"
+    "scheduleEnd",
+    "showTimer", // only used for messaging
   ]);
 
-  if (data.disableAll) return true; // Kill switch active
+  if (data.disableAll) { // Kill switch active
+    if (notifyTimer) sendIsDisabledToTimer(true, data.showTimer);
+    return true; 
+  }
 
   const now = new Date();
   const currentDay = now.getDay(); 
   const currentTime = now.getHours() * 60 + now.getMinutes();
 
   // Days allowed
-  let isDayAllowed = true;
-  if (!data.allWeek) {
-    const mask = (data.weekSchedule == null) ? 0b1111111 : Number(data.weekSchedule);
-    isDayAllowed = !!(mask & (1 << currentDay));
-  }
+  const mask = data.allWeek ? 0b1111111 : Number(data.weekSchedule || 0);
+  const isDayAllowed = !!(mask & (1 << currentDay));
 
   // Time allowed
   let isTimeAllowed = true;
@@ -55,7 +56,9 @@ async function checkIfDisabled() {
     isTimeAllowed = currentTime >= start && currentTime <= end;
   }
 
-  return !(isDayAllowed && isTimeAllowed); // true = disabled, false = enabled
+  const isDisabled = !(isDayAllowed && isTimeAllowed);
+  if (notifyTimer) sendIsDisabledToTimer(isDisabled, data.showTimer);
+  return isDisabled;
 }
 
 // Calculate remaining time
@@ -72,16 +75,23 @@ function normalizeUrl(url) {
 }
 
 // get best matching site for a url path
-function getMatchingSite(normalizedFullPath, websites) {
-  // Filter all sites that match
-  const matches = websites.filter(w => normalizedFullPath.startsWith(w.domain));
-  if (!matches.length) return null;
-
-  // Pick the one with the longest domain (most specific)
-  matches.sort((a, b) => b.domain.length - a.domain.length);
-  return matches[0];
+function getMatchingSite(normalizedUrl, websites) {
+  return websites.reduce((best, site) => {
+    if (normalizedUrl.startsWith(site.domain)) {
+      return !best || site.domain.length > best.domain.length ? site : best;
+    }
+    return best;
+  }, null);
 }
 
+function initializeNotificationMap(websites) {
+  websites.forEach(site => {
+    const key = site.domain;
+    if (!notificationsSent[key]) {
+      notificationsSent[key] = { 10: false, 5: false, 1: false };
+    }
+  });
+}
 // Notify the user when X time is left
 function sendTimeLeftNotification(domain, minutesLeft) {
   chrome.notifications.create(`limitless-${domain}-${minutesLeft}`, {
@@ -89,185 +99,203 @@ function sendTimeLeftNotification(domain, minutesLeft) {
     iconUrl: "assets/icons/icon128.png",
     title: "Limitless",
     silent: true,
-    message: `You have ${minutesLeft} minutes left for ${domain}`,
+    message: `You have ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'} left for ${domain}`,
     priority: 2
   });
 }
 
-// Track usage only for the tab if it's visible
-async function trackUsage(tabId, url) {
-  const disabled = await checkIfDisabled();
-  if (disabled || typeof tabId !== "number") return;
+// floating timer messaging
+function sendTimeLeftToTimer(domain, timeLeft) {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0] || !tabs[0].url.startsWith("http")) return;
 
+    chrome.tabs.sendMessage(tabs[0].id, { type: "timerUpdateTime", domain, timeLeft }, () => {
+      if (chrome.runtime.lastError) {
+        console.error("sendMessage failed:", chrome.runtime.lastError.message);
+      } else {
+        console.log("sendTimeLeftToTimer sent", domain, timeLeft);
+      }
+    });
+  });
+}
+
+function sendIsDisabledToTimer(disabled, showTimer) {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0] || !tabs[0].url.startsWith("http")) return;
+
+    chrome.tabs.sendMessage(tabs[0].id, { 
+      type: "timerUpdateDisabled", 
+      disabled, 
+      showTimer 
+    }, () => {
+      if (chrome.runtime.lastError) {
+        console.log("Pre-existing tabs could not be injected. Re-open these tabs to start using timers.");
+      }
+    });
+  });
+}
+
+
+// Track usage only for the tab if it's visible
+async function trackUsage(tabId, url, storageData) {
   try {
     const tab = await chrome.tabs.get(tabId);
     if (!tab.active || tabVisibility[tabId] === false) return;
 
     const normalizedFullPath = normalizeUrl(url);
-    chrome.storage.local.get(["websites"], (data) => {
-      let websites = data.websites || [];
-      const site = getMatchingSite(normalizedFullPath, websites);
-      if (!site) return;
+    let websites = storageData.websites || [];
+    const site = getMatchingSite(normalizedFullPath, websites);
+    if (!site) return;
 
-      const now = Date.now();
-      const lastTime = activeTabTimes[tabId] || now;
-      const diffMinutes = (now - lastTime) / 1000 / 60;
-      site.usage = (site.usage || 0) + diffMinutes;
-      activeTabTimes[tabId] = now;
+    const now = Date.now();
+    const lastTime = activeTabTimes[tabId] || now;
+    const diffMinutes = (now - lastTime) / 1000 / 60;
 
-      chrome.storage.local.set({ websites });
-    });
+    site.usage = (site.usage || 0) + diffMinutes;
+    activeTabTimes[tabId] = now;
+
+    chrome.storage.local.set({ websites });
   } catch (err) {
-    console.error("Failed to get tab in trackUsage:", err);
   }
 }
 
 // Update badge for a site
-async function updateBadge(url) {
-  const disabled = await checkIfDisabled();
-  if (disabled) return;
-
+async function updateBadge(url, storageData) {
   const normalizedFullPath = normalizeUrl(url);
-  chrome.storage.local.get(["websites"], (data) => {
-    let websites = data.websites || [];
-    const site = getMatchingSite(normalizedFullPath, websites);
-    if (!site) {
-      chrome.action.setBadgeText({ text: "" });
-      chrome.action.setBadgeBackgroundColor({ color: blueColor });
-      return;
+  let websites = storageData.websites || [];
+  const site = getMatchingSite(normalizedFullPath, websites);
+  if (!site) {
+    chrome.action.setBadgeText({ text: "" });
+    chrome.action.setBadgeBackgroundColor({ color: blueColor });
+    return;
+  }
+
+  const timeLeft = calculateTimeLeft(site);
+
+  // Send notifications if thresholds are crossed downward
+  [10, 5, 1].forEach(threshold => {
+    if (
+      timeLeft <= threshold &&
+      !notificationsSent[normalizedFullPath][threshold] &&
+      timeLeft > threshold - 1
+    ) {
+      sendTimeLeftNotification(site.domain, threshold);
+      notificationsSent[normalizedFullPath][threshold] = true;
     }
-
-    const timeLeft = calculateTimeLeft(site);
-
-    // Notification checks
-    // initialize tracking object for notifications
-    if (!notifiedThresholds[normalizedFullPath]) {
-      notifiedThresholds[normalizedFullPath] = { 10: false, 5: false, 1: false };
-    }
-
-    // Trigger thresholds only when transitioning downward
-    if (timeLeft <= 10 && !notifiedThresholds[normalizedFullPath][10] && timeLeft > 9) {
-      sendTimeLeftNotification(normalizedFullPath, 10);
-      notifiedThresholds[normalizedFullPath][10] = true;
-    }
-
-    if (timeLeft <= 5 && !notifiedThresholds[normalizedFullPath][5] && timeLeft > 4) {
-      sendTimeLeftNotification(normalizedFullPath, 5);
-      notifiedThresholds[normalizedFullPath][5] = true;
-    }
-
-    if (timeLeft <= 1 && !notifiedThresholds[normalizedFullPath][1] && timeLeft > 0.9) {
-      sendTimeLeftNotification(normalizedFullPath, 1);
-      notifiedThresholds[normalizedFullPath][1] = true;
-    }
-
-    //Badge logic
-    let text = "";
-    let color = blueColor;
-
-    if (timeLeft > 1) {
-        text = Math.floor(timeLeft) + "m";
-        if (timeLeft <= 15) color = orangeColor;
-    } else if (timeLeft > 0) {
-        text = "<1m";
-        color = redColor;
-    } else {
-        text = "0m";
-        color = grayColor;
-    }
-
-    chrome.action.setBadgeText({ text });
-    chrome.action.setBadgeBackgroundColor({ color });
   });
+
+  //Badge logic
+  let text = "";
+  let color = blueColor;
+
+  if (timeLeft > 1) {
+    text = Math.floor(timeLeft) + "m";
+    if (timeLeft <= 10) color = orangeColor;
+  } else if (timeLeft > 0) {
+    text = "<1m";
+    color = redColor;
+  } else {
+    text = "0m";
+    color = grayColor;
+  }
+
+  chrome.action.setBadgeText({ text });
+  chrome.action.setBadgeBackgroundColor({ color });
+  sendTimeLeftToTimer(site.domain, text);
 }
 
 // Block a website if limit reached
-async function checkAndBlock(tabId, url) {
-  const disabled = await checkIfDisabled();
-  if (disabled) return;
-
+async function checkAndBlock(tabId, url, storageData) {
   const normalizedFullPath = normalizeUrl(url);
-  chrome.storage.local.get(["websites", "peekDuration"], (data) => {
-    let websites = data.websites || [];
-    const site = getMatchingSite(normalizedFullPath, websites);
-    if (!site) return;
+  let websites = storageData.websites || [];
+  const site = getMatchingSite(normalizedFullPath, websites);
+  if (!site) return;
 
-    const timeLeft = calculateTimeLeft(site);
-    const peekDuration = data.peekDuration || 0.5; // minutes
+  const timeLeft = calculateTimeLeft(site);
+  const peekDuration = storageData.peekDuration || 0.25; // minutes
 
-    if (timeLeft > 0) {
-      return;
+  if (timeLeft > 0) return;
+
+  if (site.peekMode) { // peek mode delay before block
+    const now = Date.now();
+    if (!peekStartTimes[tabId]) {
+      peekStartTimes[tabId] = now;
+      peekNotified[tabId] = false;
     }
 
-    if (site.peekMode) { // peek mode delay before block
-      const now = Date.now();
-      if (!peekStartTimes[tabId]) {
-        peekStartTimes[tabId] = now;
-        peekNotified[tabId] = false;
-      }
+    // Notify ONCE when Peek Mode begins
+    if (!peekNotified[tabId]) {
+      const text =
+        peekDuration < 1 
+        ? `${peekDuration * 60} seconds`
+        : `${peekDuration > 1 ? "2 minutes" : "minute"}`
+      chrome.notifications.create(`limitless-peek-${tabId}`, {
+        type: "basic",
+        iconUrl: "assets/icons/icon128.png",
+        title: "Limitless",
+        silent: true,
+        message: `You're in Peek Mode for the next ${text}`,
+        priority: 2
+      });
+      peekNotified[tabId] = true;
+    }
 
-      // Notify ONCE when Peek Mode begins
-      if (!peekNotified[tabId]) {
-        const text =
-          peekDuration < 1 
-          ? `${peekDuration * 60} seconds`
-          : `${peekDuration > 1 ? "2 minutes" : "minute"}`
-
-        chrome.notifications.create(`limitless-peek-${tabId}`, {
-          type: "basic",
-          iconUrl: "assets/icons/icon128.png",
-          title: "Limitless",
-          silent: true,
-          message: `You're in Peek Mode for the next ${text}`,
-          priority: 2
-        });
-
-        peekNotified[tabId] = true;
-      }
-
-      const elapsedPeekTime = (now - peekStartTimes[tabId]) / 1000 / 60;
-      if (elapsedPeekTime >= peekDuration) { // block site after peek time
-        chrome.tabs.update(tabId, {
-          url: chrome.runtime.getURL(`blockedScreen/index.html?site=${site.domain}`)
-        });
-        delete peekStartTimes[tabId]; // reset for next peek
-      }
-    } else { // No peek mode, block immediately
+    const elapsedPeekTime = (now - peekStartTimes[tabId]) / 1000 / 60;
+    if (elapsedPeekTime >= peekDuration) { // block site after peek time
       chrome.tabs.update(tabId, {
         url: chrome.runtime.getURL(`blockedScreen/index.html?site=${site.domain}`)
       });
+      delete peekStartTimes[tabId]; // reset for next peek
     }
-  });
-}
+  } else { // No peek mode, block immediately
+    chrome.tabs.update(tabId, {
+      url: chrome.runtime.getURL(`blockedScreen/index.html?site=${site.domain}`)
+    });
+  };
+};
 
-// --- DAILY RESET FUNCTIONALITY ---
-function resetDailyUsage() {
+async function coreOperations() {
+  try {
+    const disabled = await checkIfDisabled();
+    if (disabled) return;
+
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tabs.length || !tabs[0].url) return;
+
+    const storageData = await getStorage(["websites", "peekDuration"]);
+    await trackUsage(tabs[0].id, tabs[0].url, storageData);
+    await checkAndBlock(tabs[0].id, tabs[0].url, storageData);
+    await updateBadge(tabs[0].url, storageData);
+  } catch (err) { console.error('core operations failed');
+  }
+};
+
+async function resetDailyUsage() {
   const today = new Date().toDateString();
-  chrome.storage.local.get(["lastReset", "websites"], (data) => {
-    if (data.lastReset !== today) {
-      const websites = data.websites || [];
-      const resetWebsites = websites.map(site => ({ ...site, usage: 0 }));
+  const storageData = await getStorage(["websites", "lastReset"]);
 
-      chrome.storage.local.set({
-        websites: resetWebsites,
-        lastReset: today
-      }, () => {
+  if (storageData.lastReset !== today) {
+    const websites = storageData.websites || [];
+    const resetWebsites = websites.map(site => ({ 
+      ...site, 
+      usage: 0
+    }));
 
-        // Reset notification thresholds
-        for (const domain in notifiedThresholds) {
-          notifiedThresholds[domain] = { 10: false, 5: false, 1: false };
-        }
+    await new Promise((resolve) =>
+      chrome.storage.local.set({ websites: resetWebsites, lastReset: today }, resolve)
+    );
 
-        // Refresh badge for active tab if necessary
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs[0] && tabs[0].url) {
-            updateBadge(tabs[0].url);
-          }
-        });
-      });
+    Object.keys(notificationsSent).forEach(key => {
+      notificationsSent[key] = { 10: false, 5: false, 1: false };
+    });
+    
+    // Refresh badge for active tab if necessary
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs[0] && tabs[0].url) {
+      await updateBadge(tabs[0].url, {websites: resetWebsites });
     }
-  });
-}
+  }
+};
 
 // Schedule next midnight alarm
 function scheduleMidnightReset() {
@@ -279,51 +307,44 @@ function scheduleMidnightReset() {
   chrome.alarms.create("midnightReset", { when: Date.now() + msUntilMidnight });
 }
 
-// Listeners for immediate updates
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (tab.url) {
-    // Block immediately before page load
-    checkAndBlock(tabId, tab.url);
-    updateBadge(tab.url);
-  }
-
-  if (changeInfo.status === "complete" && tab.url) { // Fire after page is finished loading
-    trackUsage(tabId, tab.url);
-  }
+// Update when tab is activated or updated
+chrome.tabs.onUpdated.addListener(async () => {
+  await coreOperations();
 });
 
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  const tab = await chrome.tabs.get(activeInfo.tabId);
-  if (tab.url) {
-    checkAndBlock(tab.id, tab.url);
-    updateBadge(tab.url);
-    trackUsage(tab.id, tab.url);
-  }
+chrome.tabs.onActivated.addListener(async () => {
+  await coreOperations();
 });
 
 // Clean up state when a tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
-    delete peekStartTimes[tabId];
-    delete peekNotified[tabId];
-    delete tabVisibility[tabId];
-    delete activeTabTimes[tabId];
+  delete peekStartTimes[tabId];
+  delete peekNotified[tabId];
+  delete tabVisibility[tabId];
+  delete activeTabTimes[tabId];
 });
 
-// send disabled status to popup
-chrome.runtime.onMessage.addListener((msg, sender, respond) => {
-  if (msg.type === "CHECK_DISABLED") {
-    checkIfDisabled().then(disabled => {
-      respond({ disabled });
-    });
-    return true;
+// send disabled status to popup and listen for visiblity messages
+chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
+  if (msg.type === "settingsUpdated") {
+    const storageData = await getStorage(["websites"]);
+    initializeNotificationMap(storageData.websites || []);
+    await coreOperations();
+    return false; 
   }
-});
-
-// Listen for visibility messages from content script
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === "tab-visibility" && sender.tab) {
+  if (msg.type === "checkStatusForPopup") {
+    checkIfDisabled({ notifyTimer: false })
+      .then(disabled => sendResponse({ disabled }))
+      .catch(err => {
+        console.error(err);
+        sendResponse({ disabled: true });
+      });
+    return true; // keep message channel open
+  }
+  if (msg.type === "tabVisibility" && sender.tab) {
     tabVisibility[sender.tab.id] = !!msg.visible;
     activeTabTimes[sender.tab.id] = Date.now(); // reset last active time
+    return false;
   }
 
   if (msg.type === "getTimeLeft" && msg.domain) {
@@ -336,46 +357,46 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === "getWebsites") {
-    chrome.storage.local.get(["websites"], (data) => {
-      sendResponse(data.websites || []);
-    });
+    chrome.storage.local.get(["websites"], (data) => sendResponse(data.websites || []));
     return true;
   }
-  return false;
+
 });
 
 // Periodic badge updates for active tab
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.alarms.create("updateBadge", { periodInMinutes: 5 / 60 }); // every 5 seconds
-  chrome.action.setBadgeBackgroundColor({ color: blueColor });
-  chrome.action.setBadgeText({ text: "" });
+chrome.runtime.onInstalled.addListener(async () => {
+  chrome.alarms.create("updateAll", { periodInMinutes: 5 / 60 }); // every 5 seconds
 
-  const today = new Date().toDateString(); // Initialize lastReset date
-  chrome.storage.local.get(["lastReset"], (data) => {
-    if (!data.lastReset) {
-      chrome.storage.local.set({ lastReset: today });
-    }
+  chrome.notifications.create(`limitless-install`, {
+    type: "basic",
+    iconUrl: "assets/icons/icon128.png",
+    title: "Limitless",
+    silent: true,
+    requireInteraction: true,
+    message: `Thanks for using Limitless! Be sure to pin the extension to the toolbar to see your live website timers.`,
+    priority: 2
   });
 
+  const today = new Date().toDateString(); // Initialize lastReset date
+  const storageData = await getStorage(["lastReset", "websites"]);
+  initializeNotificationMap(storageData.websites || []);
+
+  if (!storageData.lastReset) {
+    chrome.storage.local.set({ lastReset: today });
+  }
   scheduleMidnightReset(); // schedule next reset
 });
 
-chrome.runtime.onStartup.addListener(() => {
-  resetDailyUsage(); // reset on browser startup
+chrome.runtime.onStartup.addListener( async () => {
+  await resetDailyUsage(); // check for reset on browser startup
   scheduleMidnightReset(); // schedule next reset
+  const storageData = await getStorage(["websites"]);
+  initializeNotificationMap(storageData.websites || []);
 });
 
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "updateBadge") {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0] || !tabs[0].url) return;
-      const tabId = tabs[0].id;
-      const url = tabs[0].url;
-
-      checkAndBlock(tabId, url);
-      updateBadge(url);
-      trackUsage(tabId, url);
-    });
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === "updateAll") {
+    await coreOperations();
   } else if (alarm.name === "midnightReset") {
     resetDailyUsage();
     scheduleMidnightReset(); // schedule for the next midnight

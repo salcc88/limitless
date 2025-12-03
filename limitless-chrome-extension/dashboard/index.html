@@ -17,6 +17,19 @@
       </div>
 
       <div class="dash-content">
+
+        <!-- SHOW TIMER -->
+        <div class="flexcol-tight killswitch-can-disable">
+          <div class="section-title">
+            <h3 class="blue">Show Pop-Up Timer</h3>
+            <div class="line"></div>
+          </div>
+          <p class="section-desc subtext">Display a timer on websites with active limits. The extension icon will always display the time left badge.</p>
+          <label class="toggle-switch left-m-1">
+            <input type="checkbox" id="timer-toggle" aria-label="Toggle pop-up timer.">
+            <span class="switch-slider"></span> 
+          </label>
+        </div>
         
         <!-- ADD NEW LIMIT -->
         <div class="flexcol-tight killswitch-can-disable">
@@ -77,20 +90,20 @@
             <div class="schedule-col">
               <span class="subtext blue">All Week</span>
               <label class="toggle-switch">
-                <input type="checkbox" id="all-week-toggle">
+                <input type="checkbox" id="all-week-toggle" aria-label="Toggle all week.">
                 <span class="switch-slider"></span> 
               </label>
             </div>
             <div class="schedule-col all-week-can-disable">
               <span class="subtext blue">Select Days</span>
               <div class="day-toggles">
-                <label><input type="checkbox" id="day-sun" class="day-checkbox" value="0"><span class="base-text">Sun</span></label>
-                <label><input type="checkbox" id="day-mon" class="day-checkbox" value="1"><span class="base-text">Mon</span></label>
-                <label><input type="checkbox" id="day-tue" class="day-checkbox" value="2"><span class="base-text">Tue</span></label>
-                <label><input type="checkbox" id="day-wed" class="day-checkbox" value="3"><span class="base-text">Wed</span></label>
-                <label><input type="checkbox" id="day-thu" class="day-checkbox" value="4"><span class="base-text">Thu</span></label>
-                <label><input type="checkbox" id="day-fri" class="day-checkbox" value="5"><span class="base-text">Fri</span></label>
-                <label><input type="checkbox" id="day-sat" class="day-checkbox" value="6"><span class="base-text">Sat</span></label>
+                <label><input type="checkbox" id="day-sun" class="day-checkbox" value="0" ><span class="base-text">Sun</span></label>
+                <label><input type="checkbox" id="day-mon" class="day-checkbox" value="1" ><span class="base-text">Mon</span></label>
+                <label><input type="checkbox" id="day-tue" class="day-checkbox" value="2" ><span class="base-text">Tue</span></label>
+                <label><input type="checkbox" id="day-wed" class="day-checkbox" value="3" ><span class="base-text">Wed</span></label>
+                <label><input type="checkbox" id="day-thu" class="day-checkbox" value="4" ><span class="base-text">Thu</span></label>
+                <label><input type="checkbox" id="day-fri" class="day-checkbox" value="5" ><span class="base-text">Fri</span></label>
+                <label><input type="checkbox" id="day-sat" class="day-checkbox" value="6" ><span class="base-text">Sat</span></label>
               </div>
             </div>
           </div>
@@ -99,16 +112,16 @@
             <div class="schedule-col">
               <span class="subtext blue">All Day</span>
               <label class="toggle-switch">
-                <input type="checkbox" id="all-day-toggle">
+                <input type="checkbox" id="all-day-toggle" aria-label="Toggle all day.">
                 <span class="switch-slider"></span> 
               </label>
             </div>
             <div class="schedule-col all-day-can-disable">
               <span class="subtext blue">Select Times</span>
               <div class="flexrow-tight">
-                <span class="base-text">From</span>
+                <label for="start-time" class="base-text">From</label>
                 <select id="start-time" class="base-text"></select>
-                <span class="base-text">To</span>
+                <label for="end-time" class="base-text">To</label>
                 <select id="end-time" class="base-text"></select>
               </div>
             </div>
@@ -121,16 +134,16 @@
             <h3 class="blue">Disable Limitless</h3>
             <div class="line"></div>
           </div>
-          <p class="section-desc subtext red">Disable all Limitless functionality.</p>
+          <p class="section-desc subtext red">Disable all Limitless features.</p>
           <label class="toggle-switch left-m-1">
-            <input type="checkbox" id="kill-switch">
+            <input type="checkbox" id="kill-switch" aria-label="Disable all features">
             <span class="switch-slider danger"></span> 
           </label>
         </div>
 
         <!-- FOOTER -->
         <footer>
-          <p class="section-desc subtext">Limitless is open-source and free. Your data and time are kept safe.</p>
+          <p class="section-desc subtext">Limitless is open-source and free. Your data and time are kept yours.</p>
         </footer>
 
       </div>
