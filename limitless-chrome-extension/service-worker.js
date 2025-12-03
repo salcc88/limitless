@@ -24,17 +24,21 @@ function timeStringToMinutes(str) {
   const [h, m] = str.split(":").map(Number);
   return h * 60 + m;
 }
-async function checkIfDisabled() {
+async function checkIfDisabled( { notifyTimer = true } = {}) {
   const data = await getStorage([
     "disableAll",
     "allWeek",
     "allDay",
     "weekSchedule",
     "scheduleStart",
-    "scheduleEnd"
+    "scheduleEnd",
+    "showTimer", // only used for messaging
   ]);
 
-  if (data.disableAll) return true; // Kill switch active
+  if (data.disableAll) { // Kill switch active
+    if (notifyTimer) sendIsDisabledToTimer(true, data.showTimer);
+    return true; 
+  }
 
   const now = new Date();
   const currentDay = now.getDay(); 
@@ -52,7 +56,9 @@ async function checkIfDisabled() {
     isTimeAllowed = currentTime >= start && currentTime <= end;
   }
 
-  return !(isDayAllowed && isTimeAllowed); // true = disabled, false = enabled
+  const isDisabled = !(isDayAllowed && isTimeAllowed);
+  if (notifyTimer) sendIsDisabledToTimer(isDisabled, data.showTimer);
+  return isDisabled;
 }
 
 // Calculate remaining time
@@ -78,6 +84,14 @@ function getMatchingSite(normalizedUrl, websites) {
   }, null);
 }
 
+function initializeNotificationMap(websites) {
+  websites.forEach(site => {
+    const key = site.domain;
+    if (!notificationsSent[key]) {
+      notificationsSent[key] = { 10: false, 5: false, 1: false };
+    }
+  });
+}
 // Notify the user when X time is left
 function sendTimeLeftNotification(domain, minutesLeft) {
   chrome.notifications.create(`limitless-${domain}-${minutesLeft}`, {
@@ -90,11 +104,40 @@ function sendTimeLeftNotification(domain, minutesLeft) {
   });
 }
 
+// floating timer messaging
+function sendTimeLeftToTimer(domain, timeLeft) {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0] || !tabs[0].url.startsWith("http")) return;
+
+    chrome.tabs.sendMessage(tabs[0].id, { type: "timerUpdateTime", domain, timeLeft }, () => {
+      if (chrome.runtime.lastError) {
+        console.error("sendMessage failed:", chrome.runtime.lastError.message);
+      } else {
+        console.log("sendTimeLeftToTimer sent", domain, timeLeft);
+      }
+    });
+  });
+}
+
+function sendIsDisabledToTimer(disabled, showTimer) {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0] || !tabs[0].url.startsWith("http")) return;
+
+    chrome.tabs.sendMessage(tabs[0].id, { 
+      type: "timerUpdateDisabled", 
+      disabled, 
+      showTimer 
+    }, () => {
+      if (chrome.runtime.lastError) {
+        console.log("Pre-existing tabs could not be injected. Re-open these tabs to start using timers.");
+      }
+    });
+  });
+}
+
+
 // Track usage only for the tab if it's visible
 async function trackUsage(tabId, url, storageData) {
-  const disabled = await checkIfDisabled();
-  if (disabled || typeof tabId !== "number") return;
-
   try {
     const tab = await chrome.tabs.get(tabId);
     if (!tab.active || tabVisibility[tabId] === false) return;
@@ -118,9 +161,6 @@ async function trackUsage(tabId, url, storageData) {
 
 // Update badge for a site
 async function updateBadge(url, storageData) {
-  const disabled = await checkIfDisabled();
-  if (disabled) return;
-
   const normalizedFullPath = normalizeUrl(url);
   let websites = storageData.websites || [];
   const site = getMatchingSite(normalizedFullPath, websites);
@@ -131,11 +171,6 @@ async function updateBadge(url, storageData) {
   }
 
   const timeLeft = calculateTimeLeft(site);
-
-  // Initialize in-memory map for this site if needed
-  if (!notificationsSent[normalizedFullPath]) {
-    notificationsSent[normalizedFullPath] = {10: false, 5: false, 1: false};
-  }
 
   // Send notifications if thresholds are crossed downward
   [10, 5, 1].forEach(threshold => {
@@ -155,7 +190,7 @@ async function updateBadge(url, storageData) {
 
   if (timeLeft > 1) {
     text = Math.floor(timeLeft) + "m";
-    if (timeLeft <= 15) color = orangeColor;
+    if (timeLeft <= 10) color = orangeColor;
   } else if (timeLeft > 0) {
     text = "<1m";
     color = redColor;
@@ -166,13 +201,11 @@ async function updateBadge(url, storageData) {
 
   chrome.action.setBadgeText({ text });
   chrome.action.setBadgeBackgroundColor({ color });
+  sendTimeLeftToTimer(site.domain, text);
 }
 
 // Block a website if limit reached
 async function checkAndBlock(tabId, url, storageData) {
-  const disabled = await checkIfDisabled();
-  if (disabled) return;
-
   const normalizedFullPath = normalizeUrl(url);
   let websites = storageData.websites || [];
   const site = getMatchingSite(normalizedFullPath, websites);
@@ -221,6 +254,22 @@ async function checkAndBlock(tabId, url, storageData) {
   };
 };
 
+async function coreOperations() {
+  try {
+    const disabled = await checkIfDisabled();
+    if (disabled) return;
+
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tabs.length || !tabs[0].url) return;
+
+    const storageData = await getStorage(["websites", "peekDuration"]);
+    await trackUsage(tabs[0].id, tabs[0].url, storageData);
+    await checkAndBlock(tabs[0].id, tabs[0].url, storageData);
+    await updateBadge(tabs[0].url, storageData);
+  } catch (err) { console.error('core operations failed');
+  }
+};
+
 async function resetDailyUsage() {
   const today = new Date().toDateString();
   const storageData = await getStorage(["websites", "lastReset"]);
@@ -246,7 +295,7 @@ async function resetDailyUsage() {
       await updateBadge(tabs[0].url, {websites: resetWebsites });
     }
   }
-}
+};
 
 // Schedule next midnight alarm
 function scheduleMidnightReset() {
@@ -258,51 +307,41 @@ function scheduleMidnightReset() {
   chrome.alarms.create("midnightReset", { when: Date.now() + msUntilMidnight });
 }
 
-// Listeners for immediate updates
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (!tab.url) return;
-
-  try {
-    const storageData = await getStorage(["websites", "peekDuration"]);
-
-    await checkAndBlock(tabId, tab.url, storageData),
-    await updateBadge(tab.url, storageData)
-
-    if (changeInfo.status === "complete") { // track usage once page loads
-      await trackUsage(tabId, tab.url, storageData);
-    } 
-  } catch (err) {
-  }
+// Update when tab is activated or updated
+chrome.tabs.onUpdated.addListener(async () => {
+  await coreOperations();
 });
 
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  try {
-    const tab = await chrome.tabs.get(activeInfo.tabId);
-    if (!tab.url) return;
-    const storageData = await getStorage(["websites", "peekDuration"]);
-    await trackUsage(tab.id, tab.url, storageData);
-    await checkAndBlock(tab.id, tab.url, storageData);
-    await updateBadge(tab.url, storageData);
-  } catch (err) {
-  }
+chrome.tabs.onActivated.addListener(async () => {
+  await coreOperations();
 });
 
 // Clean up state when a tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
-    delete peekStartTimes[tabId];
-    delete peekNotified[tabId];
-    delete tabVisibility[tabId];
-    delete activeTabTimes[tabId];
+  delete peekStartTimes[tabId];
+  delete peekNotified[tabId];
+  delete tabVisibility[tabId];
+  delete activeTabTimes[tabId];
 });
 
 // send disabled status to popup and listen for visiblity messages
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === "CHECK_DISABLED") {
-    checkIfDisabled().then(disabled => sendResponse({ disabled }));
-    return true;
+chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
+  if (msg.type === "settingsUpdated") {
+    const storageData = await getStorage(["websites"]);
+    initializeNotificationMap(storageData.websites || []);
+    await coreOperations();
+    return false; 
   }
-
-  if (msg.type === "tab-visibility" && sender.tab) {
+  if (msg.type === "checkStatusForPopup") {
+    checkIfDisabled({ notifyTimer: false })
+      .then(disabled => sendResponse({ disabled }))
+      .catch(err => {
+        console.error(err);
+        sendResponse({ disabled: true });
+      });
+    return true; // keep message channel open
+  }
+  if (msg.type === "tabVisibility" && sender.tab) {
     tabVisibility[sender.tab.id] = !!msg.visible;
     activeTabTimes[sender.tab.id] = Date.now(); // reset last active time
     return false;
@@ -325,8 +364,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 // Periodic badge updates for active tab
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.alarms.create("updateBadge", { periodInMinutes: 5 / 60 }); // every 5 seconds
+chrome.runtime.onInstalled.addListener(async () => {
+  chrome.alarms.create("updateAll", { periodInMinutes: 5 / 60 }); // every 5 seconds
 
   chrome.notifications.create(`limitless-install`, {
     type: "basic",
@@ -339,35 +378,25 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 
   const today = new Date().toDateString(); // Initialize lastReset date
-  chrome.storage.local.get(["lastReset"], (data) => {
-    if (!data.lastReset) {
-      chrome.storage.local.set({ lastReset: today });
-    }
-  });
+  const storageData = await getStorage(["lastReset", "websites"]);
+  initializeNotificationMap(storageData.websites || []);
 
+  if (!storageData.lastReset) {
+    chrome.storage.local.set({ lastReset: today });
+  }
   scheduleMidnightReset(); // schedule next reset
 });
 
-chrome.runtime.onStartup.addListener(() => {
-  resetDailyUsage(); // reset on browser startup
+chrome.runtime.onStartup.addListener( async () => {
+  await resetDailyUsage(); // check for reset on browser startup
   scheduleMidnightReset(); // schedule next reset
+  const storageData = await getStorage(["websites"]);
+  initializeNotificationMap(storageData.websites || []);
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === "updateBadge") {
-    try {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tabs[0] || !tabs[0].url) return;
-
-      const tabId = tabs[0].id;
-      const url = tabs[0].url;
-
-      const storageData = await getStorage(["websites", "peekDuration"]);
-      await trackUsage(tabId, url, storageData);
-      await checkAndBlock(tabId, url, storageData);
-      await updateBadge(url, storageData);
-    } catch (err) {
-    }
+  if (alarm.name === "updateAll") {
+    await coreOperations();
   } else if (alarm.name === "midnightReset") {
     resetDailyUsage();
     scheduleMidnightReset(); // schedule for the next midnight
