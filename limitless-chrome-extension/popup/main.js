@@ -1,7 +1,7 @@
 const configureBtn = document.getElementById("configure-btn");
 
 // ask for disabled status
-chrome.runtime.sendMessage({ type: "CHECK_DISABLED" }, (res) => {
+chrome.runtime.sendMessage({ type: "checkStatusForPopup" }, (res) => {
   const disabled = res?.disabled;
   const statusSpan = document.getElementById("status");
 

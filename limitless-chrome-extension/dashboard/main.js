@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const addNewButton = document.getElementById("add-site");
     const newDomainInput = document.getElementById("domain-entry");
     const peekSelect = document.getElementById("peek-time");
+    const timerToggle = document.getElementById("timer-toggle")
     const killSwitchToggle = document.getElementById("kill-switch");
     const dashSections = document.querySelectorAll(".killswitch-can-disable")
     // schedule elements
@@ -22,7 +23,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let allDay = true
     let scheduleStart = "09:00"; 
     let scheduleEnd = "17:30";
-    let disableAll = false
+    let showTimer = true;
+    let disableAll = false;
 
     // Construct start and end time selects
     function generateTimeOptions(startSelect, endSelect) {
@@ -99,6 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
         "scheduleStart", 
         "scheduleEnd",
         "allDay",
+        "showTimer",
         "disableAll",
       ], (data) => {
 
@@ -111,6 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
           weekSchedule: 0b0000000,
           scheduleStart: "09:00",
           scheduleEnd: "17:30",
+          showTimer: true,
           disableAll: false,
         };
 
@@ -124,6 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
           // assign to the actual variables your UI reads
           if (key === "peekDuration") { peekDuration = value; } 
+          else if (key === "showTimer") { showTimer = value; }
           else if (key === "allWeek") { allWeek = value; } 
           else if (key === "allDay") { allDay = value; } 
           else if (key === "weekSchedule") { weekScheduleMask = value; } 
@@ -136,6 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
         allWeekToggle.checked = allWeek;
         allDayToggle.checked = allDay;
         killSwitchToggle.checked = disableAll;
+        timerToggle.checked = showTimer;
         updateDisabledWeekStyles();
         updateDisabledDayStyles();
         updateDisabledSectionStyles();
@@ -163,6 +169,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function saveConfiguration(key, value) {
       chrome.storage.local.set({ [key]: value});
+
+      chrome.runtime.sendMessage({
+        type: "settingsUpdated",
+      });
     }
 
     function renderSites() {
@@ -185,6 +195,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const timeSelect = document.createElement("select"); // time limit
           timeSelect.id = "time-select" + index;
+          timeSelect.ariaLabel = "Daily time limit.";
           timeSelect.classList.add("base-text");
           timeSelect.dataset.type = "timeSelect";
 
@@ -202,6 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const peekCheckbox = document.createElement("input");
           peekCheckbox.type = "checkbox";
+          peekCheckbox.ariaLabel = "Toggle Peek Mode.";
           peekCheckbox.id = "peek-check" + index;
           peekCheckbox.checked = !!site.peekMode;
           peekCheckbox.dataset.type = "peekCheckbox";
@@ -276,6 +288,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // input listeners
+
+    // timer toggle
+    timerToggle.addEventListener("change", () => {
+      showTimer = timerToggle.checked;
+      saveConfiguration("showTimer", showTimer);
+    })
 
     //domain input
     newDomainInput.addEventListener("input", () => {

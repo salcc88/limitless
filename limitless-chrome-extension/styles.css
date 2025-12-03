@@ -224,7 +224,7 @@ ul { /* used for site lists */
   align-items: center;
   justify-content: space-between;
   box-sizing: border-box;
-  padding: 1rem 2rem;
+  padding: 16px 32px;
   background-color: var(--blue);
 }
 .dash-header h2 {
@@ -240,7 +240,7 @@ ul { /* used for site lists */
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  padding: 2rem;
+  padding: 32px;
   gap: 2rem;
 }
 /***********************/
@@ -391,7 +391,7 @@ footer {
 /*************************/
 
 .popup-header {
-  padding: 0.5rem 1rem;
+  padding: 8px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -403,8 +403,8 @@ footer {
 .popup-content {
   display: flex;
   flex-direction: column;
-  padding: 1rem;
-  gap: 0.5rem;
+  padding: 16px;
+  gap: 16px;
   width: 180px;
   background-color: var(--white);
 }
@@ -416,7 +416,7 @@ footer {
   color: var(--blue);
 }
 #status.off {
-  color: var(--red);
+  color: var(--light-gray);
 }
 
 /*************************/
@@ -432,7 +432,7 @@ footer {
   align-items: center; 
   height: 100vh; 
   background: var(--blue);
-  gap: 1rem;
+  gap: 16px;
 }
 .blocked-wrap svg {
   width: 150px;
@@ -464,8 +464,8 @@ footer {
   }
   .dash-header,
   .dash-content {
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
 @media screen and (max-width: 680px) {
