@@ -9,6 +9,13 @@ const peekStartTimes = {}; // key: tabId, value: timestamp when peek started
 const peekNotified = {}; // Tracks if user has been notified about peek mode per tabId
 const notificationsSent = {};
 
+// Timer state
+let timerPort = null;
+let isTimerDisabled = false;  // whether timers are currently disabled
+let showTimer = true;       // whether to show timer (from storage)
+let domainString = "";   // current active domain
+let timeString = "";    // current active domain time left
+
 const blueColor = "#75f8e0";
 const orangeColor = "#FFC66B";
 const redColor = "#FF6B6B";
@@ -24,7 +31,7 @@ function timeStringToMinutes(str) {
   const [h, m] = str.split(":").map(Number);
   return h * 60 + m;
 }
-async function checkIfDisabled( { notifyTimer = true } = {}) {
+async function checkIfDisabled() {
   const data = await getStorage([
     "disableAll",
     "allWeek",
@@ -35,9 +42,11 @@ async function checkIfDisabled( { notifyTimer = true } = {}) {
     "showTimer", // only used for messaging
   ]);
 
+  showTimer = data.showTimer ?? true;
+
   if (data.disableAll) { // Kill switch active
-    //TIMER DEBUG
-    //if (notifyTimer) sendIsDisabledToTimer(true, data.showTimer);
+    isTimerDisabled = true;
+    updateBigTimer();
     return true; 
   }
 
@@ -58,8 +67,8 @@ async function checkIfDisabled( { notifyTimer = true } = {}) {
   }
 
   let isDisabled = !(isDayAllowed && isTimeAllowed);
-  //TIMER DEBUG
-  //if (notifyTimer) sendIsDisabledToTimer(isDisabled, data.showTimer);
+  isTimerDisabled = isDisabled;
+  updateBigTimer();
   return isDisabled;
 }
 
@@ -107,37 +116,16 @@ function sendTimeLeftNotification(domain, minutesLeft) {
 }
 
 // floating timer messaging
-//TIMER DEBUG
-// function sendTimeLeftToTimer(domain, timeLeft) {
-//   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-//     if (!tabs[0] || !tabs[0].url.startsWith("http")) return;
-// 
-//     chrome.tabs.sendMessage(tabs[0].id, { type: "timerUpdateTime", domain, timeLeft }, () => {
-//       if (chrome.runtime.lastError) {
-//         console.error("sendMessage failed:", chrome.runtime.lastError.message);
-//       } else {
-//         console.log("sendTimeLeftToTimer sent", domain, timeLeft);
-//       }
-//     });
-//   });
-// }
-// 
-// function sendIsDisabledToTimer(disabled, showTimer) {
-//   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-//     if (!tabs[0] || !tabs[0].url.startsWith("http")) return;
-// 
-//     chrome.tabs.sendMessage(tabs[0].id, { 
-//       type: "timerUpdateDisabled", 
-//       disabled, 
-//       showTimer 
-//     }, () => {
-//       if (chrome.runtime.lastError) {
-//         console.log("Pre-existing tabs could not be injected. Re-open these tabs to start using timers.");
-//       }
-//     });
-//   });
-// }
-
+function updateBigTimer() {
+  if (!timerPort) return;
+  timerPort.postMessage({
+    type: "timerUpdate",
+    domainString,
+    timeString,
+    isTimerDisabled,
+    showTimer
+  });
+}
 
 // Track usage only for the tab if it's visible
 async function trackUsage(tabId, url, storageData) {
@@ -204,8 +192,10 @@ async function updateBadge(url, storageData) {
 
   chrome.action.setBadgeText({ text });
   chrome.action.setBadgeBackgroundColor({ color });
-  //TIMER DEBUG
-  // sendTimeLeftToTimer(site.domain, text);
+  // Big Timer updates
+  domainString = site.domain;
+  timeString = text;
+  updateBigTimer();
 }
 
 // Block a website if limit reached
@@ -330,13 +320,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // send disabled status to popup and listen for visiblity messages
 chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
-  // TIMER DEBUG
-  // if (msg.type === "settingsUpdated") {
-  //   const storageData = await getStorage(["websites"]);
-  //   initializeNotificationMap(storageData.websites || []);
-  //   await coreOperations();
-  //   return false; 
-  // }
   if (msg.type === "tabVisibility" && sender.tab) {
     tabVisibility[sender.tab.id] = !!msg.visible;
     activeTabTimes[sender.tab.id] = Date.now(); // reset last active time
@@ -382,6 +365,21 @@ chrome.runtime.onConnect.addListener((port) => {
       const status = await checkIfDisabled({ notifyTimer: false });
       port.postMessage({ type: "updateStatusInPopup", disabledStatus: status });
     })();
+  }
+  if (port.name === "timer") {
+    timerPort = port;
+    timerPort.postMessage({
+      type: "timerUpdate",
+      domainString,
+      timeString,
+      isTimerDisabled,
+      showTimer
+    });
+
+    // cleanup if tab closes / port disconnects
+    timerPort.onDisconnect.addListener(() => {
+      timerPort = null;
+    });
   }
 });
 

@@ -169,10 +169,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function saveConfiguration(key, value) {
       chrome.storage.local.set({ [key]: value});
-      
-      chrome.runtime.sendMessage({
-        type: "settingsUpdated",
-      });
     }
 
     function renderSites() {

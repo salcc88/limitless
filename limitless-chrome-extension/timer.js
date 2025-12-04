@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let timeString = "";
   let domainString = "";
-  let isDisabled = false;
+  let isTimerDisabled = false;
   let showTimer = true;
 
   function createTimerBox() {
@@ -83,8 +83,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderTimer() {
-    if (isDisabled || !showTimer || timeString === "0m" || !timeString) {
-      if (timerBox) { timerBox.remove(); }
+    if (isTimerDisabled || !showTimer || timeString === "0m") {
+      if (timerBox) { 
+        timerBox.remove(); 
+        timerBox = null;
+      }
       return;
     }
 
@@ -95,14 +98,13 @@ document.addEventListener("DOMContentLoaded", () => {
     website.textContent = domainString;
   };
 
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === "timerUpdateTime") {
-      timeString = msg.timeLeft;
-      domainString = msg.domain;
-      renderTimer();
-    }
-    if (msg.type === "timerUpdateDisabled") {
-      isDisabled = msg.disabled;
+  const port = chrome.runtime.connect({ name: "timer" });
+
+  port.onMessage.addListener((msg) => {
+    if (msg.type === "timerUpdate") {
+      domainString = msg.domainString;
+      timeString = msg.timeString;
+      isTimerDisabled = msg.isTimerDisabled;
       showTimer = msg.showTimer;
       renderTimer();
     }
