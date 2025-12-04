@@ -76,7 +76,7 @@
   color: var(--text);
  }
  #limitless-timer-box h2.flash {
-  animation: flash 800ms ease-out forwards;
+  animation: flash 600ms ease-out forwards;
  }
 #limitless-timer-box #timer-span { 
   font-family: 'Plus Jakarta Sans', sans-serif !important;
