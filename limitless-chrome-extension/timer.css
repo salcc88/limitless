@@ -10,7 +10,8 @@
 
   --base-shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
-@media (prefers-color-scheme: dark) { /* Browser dark mode */
+/*
+@media (prefers-color-scheme: dark) {
   :root {
     --text: #FFFFFF;
     --gray: #a4b7b4;
@@ -23,6 +24,7 @@
     background-color: var(--gray);
   }
 }
+*/
 
 
 @font-face {
