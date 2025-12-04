@@ -98,7 +98,7 @@ function initializeNotificationMap(websites) {
   websites.forEach(site => {
     const key = site.domain;
     if (!notificationsSent[key]) {
-      notificationsSent[key] = { 10: false, 5: false, 1: false };
+      notificationsSent[key] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false };
     }
   });
 }
@@ -135,6 +135,7 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
         showTimer
       });
     } catch {
+      console.warn('couldnt post message updatebigstrngs');
       delete timerPorts[tabId];
       delete timerStrings[tabId];
     }
@@ -154,6 +155,7 @@ function updateBigTimerDisable() { // update visiblity vars
         showTimer
       });
     } catch {
+      console.warn('couldnt post message updatebigdisabel');
       delete timerPorts[tabId];
       delete timerStrings[tabId];
     }
@@ -199,9 +201,9 @@ async function updateBadge(url, storageData) {
   const timeLeft = calculateTimeLeft(site);
 
   // Send notifications if thresholds are crossed downward
-  [10, 5, 1].forEach(threshold => {
+  [10, 5, 4, 3, 2, 1].forEach(threshold => {
     if (!notificationsSent[normalizedFullPath]) {
-      notificationsSent[normalizedFullPath] = { 10: false, 5: false, 1: false }; // initialize safely
+      notificationsSent[normalizedFullPath] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false }; // initialize safely
     }
 
     if (
@@ -241,7 +243,7 @@ async function updateBadge(url, storageData) {
       text = "0m";
       color = grayColor;
     }
-    timeString = text;
+    timeString = (text === "<1m" ? "< 1m" : text);
   }
 
   chrome.action.setBadgeText({ text });
@@ -309,8 +311,13 @@ async function coreOperations() {
     const disabled = await checkIfDisabled();
     if (disabled) return;
 
-    const windowInfo = await chrome.windows.getCurrent({ populate: true });
-    const activeTab = windowInfo.tabs.find(tab => tab.active && tab.url);
+    const windowInfo = await chrome.windows.getCurrent({ populate: true }).catch(err => {
+      if (err.message.includes("No current window")) return null;
+      throw err;
+    });
+    if (!windowInfo) return;
+
+    const activeTab = windowInfo.tabs?.find(tab => tab.active && tab.url);
     if (!activeTab) return;
 
     const storageData = await getStorage(["websites", "peekDuration"]);
@@ -319,8 +326,7 @@ async function coreOperations() {
     await checkAndBlock(activeTab.id, activeTab.url, storageData);
     await updateBadge(activeTab.url, storageData); 
 
-  } catch (err) { console.error('core operations failed', err);
-  }
+  } catch (err) { console.error('core operations failed: ', err); }
 };
 
 async function resetDailyUsage() {
@@ -339,7 +345,7 @@ async function resetDailyUsage() {
     );
 
     Object.keys(notificationsSent).forEach(key => {
-      notificationsSent[key] = { 10: false, 5: false, 1: false };
+      notificationsSent[key] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false };
     });
     
     // Refresh badge for active tab if necessary
@@ -429,7 +435,8 @@ chrome.runtime.onConnect.addListener((port) => {
     (async () => {
       // Get the latest status right when the popup connects
       const status = await checkIfDisabled();
-      port.postMessage({ type: "updateStatusInPopup", disabledStatus: status });
+      try { port.postMessage({ type: "updateStatusInPopup", disabledStatus: status }); }
+      catch (err) { console.error(err) }
     })();
   }
   if (port.name === "timer" && port.sender?.tab?.id != null) {
@@ -447,12 +454,14 @@ chrome.runtime.onConnect.addListener((port) => {
         showTimer
       });
     } catch {
+      console.log('port name timer listener');
       delete timerPorts[tabId];
       delete timerStrings[tabId];
     }
 
     // Clean up on disconnect
     port.onDisconnect.addListener(() => {
+      console.log("Port disconnected (tab closed or bfcache)");
       delete timerPorts[tabId];
       delete timerStrings[tabId];
     });

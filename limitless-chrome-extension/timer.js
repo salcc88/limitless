@@ -105,7 +105,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (number.textContent !== timeString) {
       number.textContent = timeString;
-      number.classList.add("flash");
+      if (
+        timeString === "5m" ||
+        timeString === "4m" ||
+        timeString === "3m" ||
+        timeString === "2m" ||
+        timeString === "1m" ||
+        timeString === "< 1m" ) {
+        number.classList.add("flashing");
+      } else { 
+        number.classList.add("flash"); 
+      }
     }
     
     website.textContent = domainString;

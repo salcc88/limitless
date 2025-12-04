@@ -78,6 +78,9 @@
  #limitless-timer-box h2.flash {
   animation: flash 600ms ease-out forwards;
  }
+ #limitless-timer-box h2.flashing {
+  animation: flashing 2000ms ease-out infinite;
+ }
 #limitless-timer-box #timer-span { 
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-weight: 500;
@@ -112,6 +115,10 @@
 }
 
 @keyframes flash {
-  from { color: var(--bg);}
-  to { color: var(--text); }
+  from { opacity: 0;}
+  to { opacity: 1; }
+}
+@keyframes flashing {
+  0% { opacity: 0; }
+  33% { opacity: 1; }
 }
