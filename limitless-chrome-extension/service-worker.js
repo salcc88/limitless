@@ -461,7 +461,8 @@ chrome.runtime.onConnect.addListener((port) => {
 
     // Clean up on disconnect
     port.onDisconnect.addListener(() => {
-      console.log("Port disconnected (tab closed or bfcache)");
+      const err = chrome.runtime.lastError; // ← THIS IS THE IMPORTANT PART
+      if (err) console.warn("Port disconnect error:", err.message);
       delete timerPorts[tabId];
       delete timerStrings[tabId];
     });

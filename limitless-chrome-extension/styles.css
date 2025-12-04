@@ -221,7 +221,7 @@ ul { /* used for site lists */
 
 /*************************/
 
-.dashboard-wrap {
+#dashboard-wrap {
   width: 60%;
   margin: 50px auto;
   display: flex;
@@ -302,7 +302,7 @@ p.section-desc {
 
 /* limits section */
 
-.dashboard-wrap li { /* website list items */
+#dashboard-wrap li { /* website list items */
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -465,13 +465,14 @@ footer {
 
 /*************************/
 
-/*
+
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #FFFFFF;
     --gray: #a4b7b4;
     --bg: #1D1D1D;
 
+    --blue: var(--blue-highlight);
     --base-shadow: 0 2px 12px rgba(0,0,0,0.7);
     --switch-shadow: 0 2px 4px rgba(0,0,0,0.7);
     --button-shadow: 0 1px 4px rgba(0,0,0,0.6);
@@ -480,14 +481,14 @@ footer {
     background-color: var(--gray);
   }
 }
-*/
+
 @media screen and (max-width: 1400px) {
-  .dashboard-wrap {
+  #dashboard-wrap {
     width: 90%;
   }
 }
 @media screen and (max-width: 900px) {
-  .dashboard-wrap {
+  #dashboard-wrap {
     width: 100%;
     margin: 0;
     border-radius: 0px;
