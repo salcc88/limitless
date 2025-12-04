@@ -216,24 +216,38 @@ async function updateBadge(url, storageData) {
 
   //Badge logic
   let text = "";
+  let numberHours = Math.floor(timeLeft / 60);
+  let numberMinutes = Math.floor(timeLeft % 60);
   let color = blueColor;
 
-  if (timeLeft > 1) {
-    text = Math.floor(timeLeft) + "m";
-    if (timeLeft <= 10) color = orangeColor;
-  } else if (timeLeft > 0) {
-    text = "<1m";
-    color = redColor;
-  } else {
-    text = "0m";
-    color = grayColor;
+  if (numberHours > 0) {
+    if (numberMinutes > 0) {
+      text = `${numberHours}h${String(numberMinutes).padStart(2, "0")}`;
+      timeString = `${numberHours}h ${numberMinutes}m`; // for timer
+    } else {
+      text = `${numberHours}h`;
+      timeString = text;
+    } 
+
+  } else { // if no hour
+    if (timeLeft % 60 >= 1) {
+      text = `${numberMinutes}m`;
+      if (numberMinutes <= 10) { color = orangeColor; }
+    } else if (timeLeft % 60 > 0) {
+      text = "<1m";
+      color = redColor;
+    }
+    else {
+      text = "0m";
+      color = grayColor;
+    }
+    timeString = text;
   }
 
   chrome.action.setBadgeText({ text });
   chrome.action.setBadgeBackgroundColor({ color });
   // Big Timer updates
   domainString = site.domain;
-  timeString = text;
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tabs[0] && tabs[0].id) {
     updateBigTimerStrings(tabs[0].id, domainString, timeString);

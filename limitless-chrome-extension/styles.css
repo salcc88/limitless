@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Plus Jakarta Sans";
-  src: url(/assets/font/plus-jakarta-sans-500.woff2) format("woff2");
+  src: url(../assets/font/plus-jakarta-sans-500.woff2) format("woff2");
   font-optical-sizing: auto;
   font-weight: 500;
   font-style: normal;
@@ -14,15 +14,18 @@
   --blue-highlight: #43DABE;
   --orange: #FFC66B;
   --red: #FF6B6B;
-  --gray: #1D1D1D;
-  --light-gray: #939393;
-  --white: #FFFFFF;
+  
+  --text: #1D1D1D;
+  --gray: #939393;
+  --bg: #FFFFFF;
 
   --duration: 150ms;
 
-  --inner-shadow: 0 2px 12px rgba(0,0,0,0.3) inset;
-  --switch-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  --base-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  --switch-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  --button-shadow: 0 1px 4px rgba(0,0,0,0.2);
 }
+
 
 /*****************/
 
@@ -47,7 +50,7 @@ h1, h2, h3, .base-text, .subtext, button, input {
 }
 h1, h2, h3 { 
   margin: 0;
-  color: var(--gray);
+  color: var(--text);
 }
 h1 { font-size: 4rem; }
 h2 { font-size: 2rem; }
@@ -55,11 +58,11 @@ h3 { font-size: 1.2rem; }
 
 .base-text {
   font-size: 1rem;
-  color: var(--gray);
+  color: var(--text);
 }
 .subtext {
   font-size: 0.9rem;
-  color: var(--light-gray);
+  color: var(--gray);
 }
 .blue {
   color: var(--blue);
@@ -77,6 +80,17 @@ h3 { font-size: 1.2rem; }
   pointer-events: none;
 }
 
+/* svg logo */
+svg path.hourglass {
+  fill: none; 
+  stroke: var(--bg); 
+  stroke-miterlimit: 10; 
+  stroke-width: 6px;
+}
+svg path.sand {
+  fill: var(--bg);
+}
+
 /**********************/
 /* buttons and inputs */
 /**********************/
@@ -92,13 +106,15 @@ button {
   cursor: pointer;
   font-size: 1rem;
   background-color: var(--blue);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  box-shadow: var(--button-shadow);
   flex-shrink: 0;
-  color: var(--white);
-  transition: background-color var(--duration);
+  color: var(--bg);
+  transition: 
+    opacity var(--duration),
+    background-color var(--duration);
 }
 button.delete {
-  background-color: var(--light-gray);
+  background-color: var(--gray);
 }
 button:hover, 
 button:focus-visible {
@@ -119,13 +135,13 @@ input[type="text"] { /* new website input box */
   font-size: 1rem;
   width: 200px;
   padding: 0 0.5rem;
-  border: 1px solid var(--light-gray);
+  border: 1px solid var(--gray);
   border-radius: 8px;
-  background-color: var(--white);
-  color: var(--gray);
+  background-color: var(--bg);
+  color: var(--text);
 }
 input[type="text"]::placeholder {
-  color: var(--light-gray);
+  color: var(--gray);
 }
 
 input:focus,
@@ -156,13 +172,13 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--white);
-  box-shadow: var(--inner-shadow);
+  background-color: var(--bg);
+  box-shadow: var(--base-shadow) inset;
   border-radius: 16px;
   overflow: hidden;
   transition: background-color var(--duration);
 }
-.switch-slider:before { /* slider-thumb */
+.toggle-switch .switch-slider:before { /* slider-thumb */
   position: absolute;
   content: "";
   height: 24px;
@@ -170,7 +186,7 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
   width: 24px;
   left: 4px;
   bottom: 4px;
-  background-color: var(--white);
+  background-color: var(--bg);
   box-shadow: var(--switch-shadow);
   transition: transform var(--duration);
 }
@@ -186,7 +202,7 @@ label.toggle-switch input[type="checkbox"] { /* hide checkbox */
 }
 .toggle-switch input:focus-visible + .switch-slider:before,
 .toggle-switch:hover .switch-slider:before {
-  transform: translateX(3px);
+  transform: translateX(2px);
 }
 
 .toggle-switch input:checked + .switch-slider:before {
@@ -210,10 +226,10 @@ ul { /* used for site lists */
   margin: 50px auto;
   display: flex;
   flex-direction: column;
-  background-color: var(--white);
+  background-color: var(--bg);
   border-radius: 24px;
   overflow: hidden;
-  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--base-shadow);
 }
 /*******************/
 /* blue header bar */
@@ -228,7 +244,7 @@ ul { /* used for site lists */
   background-color: var(--blue);
 }
 .dash-header h2 {
-  color: var(--white);
+  color: var(--bg);
 }
 .dash-header svg {
   width: 32px;
@@ -314,8 +330,8 @@ select { /* time limit selectors */
   width: 100px;
   padding-left: 0.5rem;
   cursor: pointer;
-  border: 1px solid var(--light-gray);
-  background-color: var(--white);
+  border: 1px solid var(--gray);
+  background-color: var(--bg);
 }
 
 /* schedule section */
@@ -334,9 +350,9 @@ select { /* time limit selectors */
   padding: 4px;
   border-radius: 8px;
   height: 24px;
-  background-color: var(--white);
+  background-color: var(--bg);
   overflow: hidden;
-  box-shadow: var(--inner-shadow);
+  box-shadow: var(--base-shadow) inset;
 }
 
 .day-toggles > label {
@@ -356,7 +372,7 @@ select { /* time limit selectors */
   justify-content: center;
   width: 56px;
   height: 24px;
-  background-color: var(--white);
+  background-color: var(--bg);
   box-shadow: var(--switch-shadow);
   border-radius: 5px;
   cursor: pointer;
@@ -368,8 +384,8 @@ select { /* time limit selectors */
 }
 .day-toggles > label input:checked + span {
   background-color: var(--blue-highlight);
-  color: var(--white);
-  box-shadow: var(--inner-shadow);
+  color: var(--bg);
+  box-shadow: var(--base-shadow) inset;
 }
 
 .day-toggles > label input:focus-visible + span {
@@ -398,7 +414,7 @@ footer {
   background-color: var(--blue);
 }
 .popup-header h3 {
-  color: var(--white);
+  color: var(--bg);
 }
 .popup-content {
   display: flex;
@@ -406,7 +422,7 @@ footer {
   padding: 16px;
   gap: 16px;
   width: 180px;
-  background-color: var(--white);
+  background-color: var(--bg);
 }
 .status-box {
   display: flex;
@@ -416,7 +432,7 @@ footer {
   color: var(--blue);
 }
 #status.off {
-  color: var(--light-gray);
+  color: var(--gray);
 }
 
 /*************************/
@@ -439,15 +455,30 @@ footer {
   height: 150px;
 }
 .blocked-wrap h1, .blocked-wrap h2 {
-  color: var(--white);
+  color: var(--bg);
 }
 
 
 /************************/
 
-/*   Responsive          */
+/*   media queries       */
 
 /*************************/
+
+@media (prefers-color-scheme: dark) { /* Browser dark mode */
+  :root {
+    --text: #FFFFFF;
+    --gray: #a4b7b4;
+    --bg: #1D1D1D;
+
+    --base-shadow: 0 2px 12px rgba(0,0,0,0.7);
+    --switch-shadow: 0 2px 4px rgba(0,0,0,0.7);
+    --button-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  }
+  .toggle-switch .switch-slider {
+    background-color: var(--gray);
+  }
+}
 
 @media screen and (max-width: 1400px) {
   .dashboard-wrap {
