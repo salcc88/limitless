@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (timerBox) return;
 
     timerBox = document.createElement("div");
-    timerBox.id = "limitless-limitless-timer-box";
+    timerBox.id = "limitless-timer-box";
     timerBox.ariaHidden = true;
 
     // inner content
@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
       showTimer = false;
       renderTimer();
       chrome.storage.local.set({ showTimer: false });
-      chrome.runtime.sendMessage({ type: "updateShowTimer", showTimer: false });
+      chrome.runtime.sendMessage({ type: "disableShowTimer" });
     });
     timerBox.appendChild(closeBtn);
 

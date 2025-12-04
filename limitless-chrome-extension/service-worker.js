@@ -388,9 +388,8 @@ chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
     activeTabTimes[sender.tab.id] = Date.now(); // reset last active time
     return false;
   }
-  if (msg.type === "updateShowTimer") {
-    showTimer = msg.showTimer;
-    updateBigTimerDisable();
+  if (msg.type === "disableShowTimer") {
+    showTimer = false;
   }
 });
 
