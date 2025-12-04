@@ -309,6 +309,9 @@ p.section-desc {
   margin-bottom: 0.5rem;
   width: 100%;
 }
+li.no-limits-set { /* placeholder in list */
+  margin-top: 0.5rem;
+}
 
 span.site-name {
   width: 240px;
@@ -465,7 +468,7 @@ footer {
 
 /*************************/
 
-
+/*
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #FFFFFF;
@@ -481,6 +484,7 @@ footer {
     background-color: var(--gray);
   }
 }
+*/
 
 @media screen and (max-width: 1400px) {
   #dashboard-wrap {
