@@ -45,6 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
       showTimer = false;
       renderTimer();
       chrome.storage.local.set({ showTimer: false });
+      chrome.runtime.sendMessage({ type: "updateShowTimer", showTimer: false });
     });
     timerBox.appendChild(closeBtn);
 
@@ -121,9 +122,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // cleanup on page unload
-  window.addEventListener("beforeunload", () => {
-    if (timerBox) timerBox.remove();
-    port.disconnect(); // remove when leave webpage
-  });
+  function cleanupTimerBox() {
+    if (!timerBox) return;
+
+    try {
+      timerBox.remove();
+    } catch (err) {
+      // ignore errors if context is already invalidated
+    } finally {
+      timerBox = null;
+    }
+  }
+
+  // Pagehide fires on unload and bfcache
+  window.addEventListener("pagehide", cleanupTimerBox);
+  window.addEventListener("unload", cleanupTimerBox); // extra safety for some cases
 });

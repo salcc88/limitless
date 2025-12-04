@@ -10,11 +10,10 @@ const peekNotified = {}; // Tracks if user has been notified about peek mode per
 const notificationsSent = {};
 
 // Timer state
-let timerPort = null;
+const timerPorts = {};
+const timerStrings = {}
 let isTimerDisabled = false;  // whether timers are currently disabled
 let showTimer = true;       // whether to show timer (from storage)
-let domainString = "";   // current active domain
-let timeString = "0m";    // current active domain time left
 
 const blueColor = "#75f8e0";
 const orangeColor = "#FFC66B";
@@ -46,7 +45,7 @@ async function checkIfDisabled() {
 
   if (data.disableAll) { // Kill switch active
     isTimerDisabled = true;
-    updateBigTimer();
+    updateBigTimerDisable();
     return true; 
   }
 
@@ -68,7 +67,7 @@ async function checkIfDisabled() {
 
   let isDisabled = !(isDayAllowed && isTimeAllowed);
   isTimerDisabled = isDisabled;
-  updateBigTimer();
+  updateBigTimerDisable();
   return isDisabled;
 }
 
@@ -116,21 +115,49 @@ function sendTimeLeftNotification(domain, minutesLeft) {
 }
 
 // floating timer messaging
-function updateBigTimer() {
-  if (!timerPort) return;
-
-  try {
-    timerPort.postMessage({
-      type: "timerUpdate",
-      domainString,
-      timeString,
-      isTimerDisabled,
-      showTimer
-    });
-  } catch (err) {
-    // Port is dead; clear it to prevent further attempts
-    timerPort = null;
+function updateBigTimerStrings(activeTabId = null, domainString = "", timeString = "0m") {
+  if (activeTabId) {
+    timerStrings[activeTabId] = { domainString, timeString };
   }
+
+  Object.keys(timerPorts).forEach(tabId => {
+    const port = timerPorts[tabId];
+    if (!port) return;
+
+    const { domainString: ds = "", timeString: ts = "0m" } = timerStrings[tabId] || {};
+
+    try {
+      port.postMessage({
+        type: "timerUpdate",
+        domainString: activeTabId === Number(tabId) ? domainString : ds,
+        timeString: activeTabId === Number(tabId) ? timeString : ts,
+        isTimerDisabled,
+        showTimer
+      });
+    } catch {
+      delete timerPorts[tabId];
+      delete timerStrings[tabId];
+    }
+  });
+}
+function updateBigTimerDisable() { // update visiblity vars
+  Object.keys(timerPorts).forEach(tabId => {
+    const port = timerPorts[tabId];
+    if (!port) return;
+    const { domainString = "", timeString = "0m" } = timerStrings[tabId] || {};
+    try {
+      port.postMessage({
+        type: "timerUpdate",
+        domainString,
+        timeString,
+        isTimerDisabled,
+        showTimer
+      });
+    } catch {
+      delete timerPorts[tabId];
+      delete timerStrings[tabId];
+    }
+  });
 }
 
 // Track usage only for the tab if it's visible
@@ -158,6 +185,8 @@ async function trackUsage(tabId, url, storageData) {
 
 // Update badge for a site
 async function updateBadge(url, storageData) {
+  let domainString = "0m";
+  let timeString = "";
   const normalizedFullPath = normalizeUrl(url);
   let websites = storageData.websites || [];
   const site = getMatchingSite(normalizedFullPath, websites);
@@ -171,6 +200,10 @@ async function updateBadge(url, storageData) {
 
   // Send notifications if thresholds are crossed downward
   [10, 5, 1].forEach(threshold => {
+    if (!notificationsSent[normalizedFullPath]) {
+      notificationsSent[normalizedFullPath] = { 10: false, 5: false, 1: false }; // initialize safely
+    }
+
     if (
       timeLeft <= threshold &&
       !notificationsSent[normalizedFullPath][threshold] &&
@@ -201,7 +234,10 @@ async function updateBadge(url, storageData) {
   // Big Timer updates
   domainString = site.domain;
   timeString = text;
-  updateBigTimer();
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tabs[0] && tabs[0].id) {
+    updateBigTimerStrings(tabs[0].id, domainString, timeString);
+  }
 }
 
 // Block a website if limit reached
@@ -259,14 +295,17 @@ async function coreOperations() {
     const disabled = await checkIfDisabled();
     if (disabled) return;
 
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tabs.length || !tabs[0].url) return;
+    const windowInfo = await chrome.windows.getCurrent({ populate: true });
+    const activeTab = windowInfo.tabs.find(tab => tab.active && tab.url);
+    if (!activeTab) return;
 
     const storageData = await getStorage(["websites", "peekDuration"]);
-    await trackUsage(tabs[0].id, tabs[0].url, storageData);
-    await checkAndBlock(tabs[0].id, tabs[0].url, storageData);
-    await updateBadge(tabs[0].url, storageData);
-  } catch (err) { console.error('core operations failed');
+
+    await trackUsage(activeTab.id, activeTab.url, storageData);
+    await checkAndBlock(activeTab.id, activeTab.url, storageData);
+    await updateBadge(activeTab.url, storageData); 
+
+  } catch (err) { console.error('core operations failed', err);
   }
 };
 
@@ -315,6 +354,10 @@ chrome.tabs.onUpdated.addListener(async () => {
 chrome.tabs.onActivated.addListener(async () => {
   await coreOperations();
 });
+chrome.windows.onFocusChanged.addListener(async (windowId) => { // updates between multiple windows
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return; // no window is focused
+  await coreOperations(); 
+});
 
 // Clean up state when a tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -330,6 +373,10 @@ chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
     tabVisibility[sender.tab.id] = !!msg.visible;
     activeTabTimes[sender.tab.id] = Date.now(); // reset last active time
     return false;
+  }
+  if (msg.type === "updateShowTimer") {
+    showTimer = msg.showTimer;
+    updateBigTimerDisable();
   }
 });
 
@@ -368,16 +415,33 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "popup") {
     (async () => {
       // Get the latest status right when the popup connects
-      const status = await checkIfDisabled({ notifyTimer: false });
+      const status = await checkIfDisabled();
       port.postMessage({ type: "updateStatusInPopup", disabledStatus: status });
     })();
   }
-  if (port.name === "timer") {
-    timerPort = port;
-    updateBigTimer();
-    // cleanup if tab closes / port disconnects
-    timerPort.onDisconnect.addListener(() => {
-      timerPort = null;
+  if (port.name === "timer" && port.sender?.tab?.id != null) {
+    const tabId = port.sender.tab.id;
+    timerPorts[tabId] = port;
+
+    // Send initial state for this tab
+    const { domainString = "", timeString = "0m" } = timerStrings[tabId] || {};
+    try {
+      port.postMessage({
+        type: "timerUpdate",
+        domainString,
+        timeString,
+        isTimerDisabled,
+        showTimer
+      });
+    } catch {
+      delete timerPorts[tabId];
+      delete timerStrings[tabId];
+    }
+
+    // Clean up on disconnect
+    port.onDisconnect.addListener(() => {
+      delete timerPorts[tabId];
+      delete timerStrings[tabId];
     });
   }
 });
