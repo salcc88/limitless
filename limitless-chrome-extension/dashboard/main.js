@@ -371,8 +371,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // update timer toggle UI when X button is clicked on timer
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === "disableShowTimer") {
-      if (timerToggle) { timerToggle.checked = false; }
-      console.log('dashboard heard');
+      if (timerToggle) timerToggle.checked = false;
     }
   });
   loadAll();

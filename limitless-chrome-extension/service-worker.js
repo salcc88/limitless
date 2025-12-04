@@ -9,11 +9,16 @@ const peekStartTimes = {}; // key: tabId, value: timestamp when peek started
 const peekNotified = {}; // Tracks if user has been notified about peek mode per tabId
 const notificationsSent = {};
 
+// badge state
+const prevBadgeState = {};
+
 // Timer state
 const timerPorts = {};
 const timerStrings = {}
+const prevTimerStrings = {}
 let isTimerDisabled = false;  // whether timers are currently disabled
 let showTimer = true;       // whether to show timer (from storage)
+const prevTimerDisabled = {}
 
 const blueColor = "#75f8e0";
 const orangeColor = "#FFC66B";
@@ -120,44 +125,65 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
     timerStrings[activeTabId] = { domainString, timeString };
   }
 
-  Object.keys(timerPorts).forEach(tabId => {
-    const port = timerPorts[tabId];
+  Object.entries(timerPorts).forEach(([tabId, port]) => {
     if (!port) return;
 
-    const { domainString: ds = "", timeString: ts = "0m" } = timerStrings[tabId] || {};
+    const { domainString: domain = "", timeString: time = "0m" } = timerStrings[tabId] || {};
 
-    try {
-      port.postMessage({
-        type: "timerUpdate",
-        domainString: activeTabId === Number(tabId) ? domainString : ds,
-        timeString: activeTabId === Number(tabId) ? timeString : ts,
-        isTimerDisabled,
-        showTimer
-      });
-    } catch {
-      console.warn('couldnt post message updatebigstrngs');
-      delete timerPorts[tabId];
-      delete timerStrings[tabId];
+    const timerMessage = {
+      type: "timerUpdate",
+      domainString: activeTabId === Number(tabId) ? domainString : domain,
+      timeString: activeTabId === Number(tabId) ? timeString : time,
+      isTimerDisabled,
+      showTimer
+    }
+
+    const prev = prevTimerStrings[tabId];
+    if (
+      !prev ||
+      prev.domainString !== timerMessage.domainString ||
+      prev.timeString !== timerMessage.timeString
+    ) {
+      try { 
+        port.postMessage(timerMessage) 
+        prevTimerStrings[tabId] = timerMessage; 
+      } catch {
+        console.warn('couldnt post message updatebigstrings');
+        delete timerPorts[tabId];
+        delete timerStrings[tabId];
+        delete prevTimerStrings[tabId];
+      }
     }
   });
 }
 function updateBigTimerDisable() { // update visiblity vars
-  Object.keys(timerPorts).forEach(tabId => {
-    const port = timerPorts[tabId];
+  Object.entries(timerPorts).forEach(([tabId, port]) => {
     if (!port) return;
+
     const { domainString = "", timeString = "0m" } = timerStrings[tabId] || {};
-    try {
-      port.postMessage({
-        type: "timerUpdate",
-        domainString,
-        timeString,
-        isTimerDisabled,
-        showTimer
-      });
-    } catch {
-      console.warn('couldnt post message updatebigdisabel');
-      delete timerPorts[tabId];
-      delete timerStrings[tabId];
+    const timerMessage = {
+      type: "timerUpdate",
+      domainString,
+      timeString,
+      isTimerDisabled,
+      showTimer
+    }
+
+    const prev = prevTimerStrings[tabId];
+    if (
+      !prev || 
+      prev.isTimerDisabled !== timerMessage.isTimerDisabled || 
+      prev.showTimer !== timerMessage.showTimer
+    ) {
+      try {
+        port.postMessage(timerMessage);
+        prevTimerDisabled[tabId] = { isTimerDisabled, showTimer };
+      } catch {
+        console.warn('couldnt post message updatebigdisabel');
+        delete timerPorts[tabId];
+        delete timerStrings[tabId];
+        delete prevTimerDisabled[tabId];
+      }
     }
   });
 }
@@ -207,9 +233,9 @@ async function updateBadge(url, storageData) {
     }
 
     if (
-      timeLeft <= threshold &&
+      Math.floor(timeLeft) <= threshold &&
       !notificationsSent[normalizedFullPath][threshold] &&
-      timeLeft > threshold - 1
+      Math.floor(timeLeft) > threshold - 1
     ) {
       sendTimeLeftNotification(site.domain, threshold);
       notificationsSent[normalizedFullPath][threshold] = true;
@@ -243,7 +269,7 @@ async function updateBadge(url, storageData) {
       text = "0m";
       color = grayColor;
     }
-    timeString = (text === "<1m" ? "< 1m" : text);
+    timeString = text;
   }
 
   chrome.action.setBadgeText({ text });
@@ -264,9 +290,9 @@ async function checkAndBlock(tabId, url, storageData) {
   if (!site) return;
 
   const timeLeft = calculateTimeLeft(site);
-  const peekDuration = storageData.peekDuration || 0.25; // minutes
+  if (timeLeft > 0) return; // not blocked
 
-  if (timeLeft > 0) return;
+  const peekDuration = storageData.peekDuration || 0.25; // minutes
 
   if (site.peekMode) { // peek mode delay before block
     const now = Date.now();
