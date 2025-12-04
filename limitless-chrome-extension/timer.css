@@ -36,19 +36,17 @@
   font-display: swap;
 }
 
-#timer-box {
+#limitless-timer-box {
   position: fixed;
   top: 20px;
   left: 20px;
   width: 130px;
-  box-sizing: border-box;
+  box-sizing: border-box !important;
   overflow: hidden;
   padding: 24px 0px 16px 0px;
   background-color: rgba(var(--bg-rgb), 0.9);
   border: 2px solid var(--text);
   border-radius: 8px;
-  font-family: "Plus Jakarta Sans", sans-serif;
-  font-size: 2rem;
   z-index: 999999;
   pointer-events: auto;
   box-shadow: var(--base-shadow);
@@ -58,53 +56,57 @@
   cursor: grab;
   user-select: none;
 }
-#timer-box:active {
+#limitless-timer-box:active {
   cursor: grabbing;
 }
-#timer-box #domain-span { 
-  font-family: 'Plus Jakarta Sans', sans-serif;
+#limitless-timer-box #domain-span { 
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-weight: 500;
   color: var(--gray);
-  font-size: 0.8rem; 
+  font-size: 0.8rem !important;
   width: 130px;
   text-align: center;
 }
-#timer-box h2 { 
-  font-size: 2rem;
+#limitless-timer-box h2 { 
+  font-size: 2rem !important;
   line-height: 2rem;
   margin: 0;
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-weight: 500;
   color: var(--text);
  }
- #timer-box h2.flash {
+ #limitless-timer-box h2.flash {
   animation: flash 800ms ease-out forwards;
  }
-#timer-box #timer-span { 
-  font-family: 'Plus Jakarta Sans', sans-serif;
+#limitless-timer-box #timer-span { 
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-weight: 500;
   color: var(--gray);
-  font-size: 1rem; 
+  font-size: 1rem !important;
 }
 
-
-#timer-box #close-button {
+#limitless-timer-box #close-button {
   position: absolute;
   top: 2px;
   right: 2px;
   width: 24px;
   height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   box-shadow: none;
   border: none;
   cursor: pointer;
   padding: 0;
+  flex: 0;
+  border-radius: 0;
   transition: opacity 150ms;
 }
-#timer-box #close-button:hover {
+#limitless-timer-box #close-button:hover {
   opacity: 0.5;
 }
-#timer-box #close-button svg line {
+#limitless-timer-box #close-button svg line {
   stroke: var(--text);
   stroke-width: 2px;
 }

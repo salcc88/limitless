@@ -401,10 +401,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   chrome.notifications.create(`limitless-install`, {
     type: "basic",
     iconUrl: "assets/icons/icon128.png",
-    title: "Limitless",
+    title: "Thanks for using Limitless!",
     silent: true,
     requireInteraction: true,
-    message: `Thanks for using Limitless! Be sure to pin the extension to the toolbar to see your live website timers.`,
+    message: `Be sure to pin the extension to the toolbar to see your live website timers.`,
     priority: 2
   });
 

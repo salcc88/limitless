@@ -11,7 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (timerBox) return;
 
     timerBox = document.createElement("div");
-    timerBox.id = "timer-box";
+    timerBox.id = "limitless-limitless-timer-box";
+    timerBox.ariaHidden = true;
 
     // inner content
     const domainSpan = document.createElement("span");
@@ -134,7 +135,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    cleanupTimerBox();
+  }
+});
+
   // Pagehide fires on unload and bfcache
   window.addEventListener("pagehide", cleanupTimerBox);
-  window.addEventListener("unload", cleanupTimerBox); // extra safety for some cases
 });
