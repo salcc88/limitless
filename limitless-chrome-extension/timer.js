@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // content-scripts/timer.js
   let timerBox;
 
-  let timeString = "";
+  let timeString = "0m";
   let domainString = "";
   let isTimerDisabled = false;
   let showTimer = true;
@@ -21,6 +21,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const timerNumber = document.createElement("h2");
     timerNumber.id = "timer-number";
     timerBox.appendChild(timerNumber);
+    // remove animation class after animation
+    timerNumber.addEventListener("animationend", () => {
+      timerNumber.classList.remove("flash");
+    });
 
     const remainingSpan = document.createElement("span");
     remainingSpan.id = "timer-span";
@@ -38,7 +42,9 @@ document.addEventListener("DOMContentLoaded", () => {
       </svg>
     `;
     closeBtn.addEventListener("click", () => {
-      console.log('minimize');
+      showTimer = false;
+      renderTimer();
+      chrome.storage.local.set({ showTimer: false });
     });
     timerBox.appendChild(closeBtn);
 
@@ -94,7 +100,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!timerBox) createTimerBox();
     const number = timerBox.querySelector("#timer-number");
     const website = timerBox.querySelector("#domain-span");
-    number.textContent = timeString;
+
+    if (number.textContent !== timeString) {
+      number.textContent = timeString;
+      number.classList.add("flash");
+    }
+    
     website.textContent = domainString;
   };
 
@@ -113,5 +124,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // cleanup on page unload
   window.addEventListener("beforeunload", () => {
     if (timerBox) timerBox.remove();
+    port.disconnect(); // remove when leave webpage
   });
 });

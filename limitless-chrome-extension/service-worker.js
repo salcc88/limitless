@@ -14,7 +14,7 @@ let timerPort = null;
 let isTimerDisabled = false;  // whether timers are currently disabled
 let showTimer = true;       // whether to show timer (from storage)
 let domainString = "";   // current active domain
-let timeString = "";    // current active domain time left
+let timeString = "0m";    // current active domain time left
 
 const blueColor = "#75f8e0";
 const orangeColor = "#FFC66B";
@@ -118,13 +118,19 @@ function sendTimeLeftNotification(domain, minutesLeft) {
 // floating timer messaging
 function updateBigTimer() {
   if (!timerPort) return;
-  timerPort.postMessage({
-    type: "timerUpdate",
-    domainString,
-    timeString,
-    isTimerDisabled,
-    showTimer
-  });
+
+  try {
+    timerPort.postMessage({
+      type: "timerUpdate",
+      domainString,
+      timeString,
+      isTimerDisabled,
+      showTimer
+    });
+  } catch (err) {
+    // Port is dead; clear it to prevent further attempts
+    timerPort = null;
+  }
 }
 
 // Track usage only for the tab if it's visible
@@ -368,14 +374,7 @@ chrome.runtime.onConnect.addListener((port) => {
   }
   if (port.name === "timer") {
     timerPort = port;
-    timerPort.postMessage({
-      type: "timerUpdate",
-      domainString,
-      timeString,
-      isTimerDisabled,
-      showTimer
-    });
-
+    updateBigTimer();
     // cleanup if tab closes / port disconnects
     timerPort.onDisconnect.addListener(() => {
       timerPort = null;

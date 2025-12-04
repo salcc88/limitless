@@ -42,8 +42,10 @@
   margin: 0;
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 500;
-  color: #939393; /* initial value */
-  animation: flash 300ms ease-out forwards;
+  color: #1D1D1D;
+ }
+ #timer-box h2.flash {
+  animation: flash 800ms ease-out forwards;
  }
 #timer-box #timer-span { 
   font-family: 'Plus Jakarta Sans', sans-serif;
@@ -70,6 +72,6 @@
 }
 
 @keyframes flash {
-  from { color: #939393 ;}
+  from { color: #ffffff ;}
   to { color: #1D1D1D; }
 }
