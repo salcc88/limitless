@@ -84,6 +84,9 @@ function calculateTimeLeft(site) {
 
 // get url path with trimmed www. and trailing slash
 function normalizeUrl(url) {
+  if (!url || !url.startsWith("http")) {
+    return null; 
+  }
   const fullUrl = new URL(url);
   const normalizedUrl = (fullUrl.hostname.replace("www.", "") + fullUrl.pathname).replace(/\/$/, "");
   return (normalizedUrl);
@@ -120,7 +123,7 @@ function sendTimeLeftNotification(domain, minutesLeft) {
 }
 
 // floating timer messaging
-function updateBigTimerStrings(activeTabId = null, domainString = "", timeString = "0m") {
+function updateBigTimerStrings(activeTabId = null, domainString = "", timeString = "0m", { force = false } = {}) {
   if (activeTabId) {
     timerStrings[activeTabId] = { domainString, timeString };
   }
@@ -140,6 +143,7 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
 
     const prev = prevTimerStrings[tabId];
     if (
+      force ||
       !prev ||
       prev.domainString !== timerMessage.domainString ||
       prev.timeString !== timerMessage.timeString
@@ -147,6 +151,7 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
       try { 
         port.postMessage(timerMessage) 
         prevTimerStrings[tabId] = timerMessage; 
+        console.log('message stringsbig', timerMessage);
       } catch {
         console.warn('couldnt post message updatebigstrings');
         delete timerPorts[tabId];
@@ -159,8 +164,11 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
 function updateBigTimerDisable() { // update visiblity vars
   Object.entries(timerPorts).forEach(([tabId, port]) => {
     if (!port) return;
+    console.log('bigTimerDisable');
 
-    const { domainString = "", timeString = "0m" } = timerStrings[tabId] || {};
+    const domainString = prevTimerStrings[tabId]?.domainString ?? "";
+    const timeString = prevTimerStrings[tabId]?.timeString ?? "0m";
+
     const timerMessage = {
       type: "timerUpdate",
       domainString,
@@ -169,19 +177,19 @@ function updateBigTimerDisable() { // update visiblity vars
       showTimer
     }
 
-    const prev = prevTimerStrings[tabId];
+    const prev = prevTimerDisabled[tabId];
     if (
       !prev || 
-      prev.isTimerDisabled !== timerMessage.isTimerDisabled || 
-      prev.showTimer !== timerMessage.showTimer
+      prev.isTimerDisabled !== isTimerDisabled || 
+      prev.showTimer !== showTimer
     ) {
       try {
         port.postMessage(timerMessage);
+        console.log('message disabledbig', timerMessage);
         prevTimerDisabled[tabId] = { isTimerDisabled, showTimer };
       } catch {
         console.warn('couldnt post message updatebigdisabel');
         delete timerPorts[tabId];
-        delete timerStrings[tabId];
         delete prevTimerDisabled[tabId];
       }
     }
@@ -195,6 +203,7 @@ async function trackUsage(tabId, url, storageData) {
     if (!tab.active || tabVisibility[tabId] === false) return;
 
     const normalizedFullPath = normalizeUrl(url);
+    if (!normalizedFullPath) return;
     let websites = storageData.websites || [];
     const site = getMatchingSite(normalizedFullPath, websites);
     if (!site) return;
@@ -212,79 +221,86 @@ async function trackUsage(tabId, url, storageData) {
 }
 
 // Update badge for a site
-async function updateBadge(url, storageData) {
-  let domainString = "0m";
-  let timeString = "";
+async function updateBadge(tabId, url, storageData, { force = false } = {}) {
+  if (!tabId) return;
+  console.log('updateBadge');
   const normalizedFullPath = normalizeUrl(url);
+  if (!normalizedFullPath) return;
   let websites = storageData.websites || [];
   const site = getMatchingSite(normalizedFullPath, websites);
-  if (!site) {
-    chrome.action.setBadgeText({ text: "" });
-    chrome.action.setBadgeBackgroundColor({ color: blueColor });
-    return;
-  }
 
-  const timeLeft = calculateTimeLeft(site);
-
-  // Send notifications if thresholds are crossed downward
-  [10, 5, 4, 3, 2, 1].forEach(threshold => {
-    if (!notificationsSent[normalizedFullPath]) {
-      notificationsSent[normalizedFullPath] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false }; // initialize safely
-    }
-
-    if (
-      Math.floor(timeLeft) <= threshold &&
-      !notificationsSent[normalizedFullPath][threshold] &&
-      Math.floor(timeLeft) > threshold - 1
-    ) {
-      sendTimeLeftNotification(site.domain, threshold);
-      notificationsSent[normalizedFullPath][threshold] = true;
-    }
-  });
-
-  //Badge logic
   let text = "";
-  let numberHours = Math.floor(timeLeft / 60);
-  let numberMinutes = Math.floor(timeLeft % 60);
+  let timeString = "0m";
   let color = blueColor;
+  
+  if (site) {
+    const timeLeft = calculateTimeLeft(site);
+    let numberHours = Math.floor(timeLeft / 60);
+    let numberMinutes = Math.floor(timeLeft % 60);
+    
+    //send notifications for each threshold
+    [10, 5, 4, 3, 2, 1].forEach(threshold => {
+      if (!notificationsSent[normalizedFullPath]) {
+        notificationsSent[normalizedFullPath] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false }; // initialize safely
+      }
 
-  if (numberHours > 0) {
-    if (numberMinutes > 0) {
-      text = `${numberHours}h${String(numberMinutes).padStart(2, "0")}`;
-      timeString = `${numberHours}h ${numberMinutes}m`; // for timer
-    } else {
-      text = `${numberHours}h`;
+      if (
+        Math.floor(timeLeft) <= threshold &&
+        !notificationsSent[normalizedFullPath][threshold] &&
+        Math.floor(timeLeft) > threshold - 1
+      ) {
+        sendTimeLeftNotification(site.domain, threshold);
+        notificationsSent[normalizedFullPath][threshold] = true;
+      }
+    });
+
+    //Badge logic
+    if (numberHours > 0) {
+      if (numberMinutes > 0) {
+        text = `${numberHours}h${String(numberMinutes).padStart(2, "0")}`;
+        timeString = `${numberHours}h ${numberMinutes}m`; // for timer
+      } else {
+        text = `${numberHours}h`;
+        timeString = text;
+      } 
+    } else { // if no hour
+      if (timeLeft % 60 >= 1) {
+        text = `${numberMinutes}m`;
+        if (numberMinutes <= 10) { color = orangeColor; }
+      } else if (timeLeft % 60 > 0) {
+        text = "<1m";
+        color = redColor;
+      }
+      else {
+        text = "0m";
+        color = grayColor;
+      }
       timeString = text;
-    } 
-
-  } else { // if no hour
-    if (timeLeft % 60 >= 1) {
-      text = `${numberMinutes}m`;
-      if (numberMinutes <= 10) { color = orangeColor; }
-    } else if (timeLeft % 60 > 0) {
-      text = "<1m";
-      color = redColor;
     }
-    else {
-      text = "0m";
-      color = grayColor;
-    }
-    timeString = text;
+  } else {
+    text = "";
+    color = blueColor;
+    timeString = "0m"
   }
 
-  chrome.action.setBadgeText({ text });
-  chrome.action.setBadgeBackgroundColor({ color });
-  // Big Timer updates
-  domainString = site.domain;
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tabs[0] && tabs[0].id) {
-    updateBigTimerStrings(tabs[0].id, domainString, timeString);
+  const prev = prevBadgeState[tabId] || {};
+  console.log('is setting badge?', prev.text !== text || force);
+  if (force || prev.text !== text) {
+    chrome.action.setBadgeText({ text });
+    chrome.action.setBadgeBackgroundColor({ color });
+    prevBadgeState[tabId] = {text};
+  }
+
+  if (site) {
+    console.log('bigTimerStrings', site.domain, timeString);
+    updateBigTimerStrings(tabId, site.domain, timeString, { force });
   }
 }
 
 // Block a website if limit reached
 async function checkAndBlock(tabId, url, storageData) {
   const normalizedFullPath = normalizeUrl(url);
+  if (!normalizedFullPath) return;
   let websites = storageData.websites || [];
   const site = getMatchingSite(normalizedFullPath, websites);
   if (!site) return;
@@ -332,7 +348,7 @@ async function checkAndBlock(tabId, url, storageData) {
   };
 };
 
-async function coreOperations() {
+async function coreOperations({ forceAll = false } = {}) {
   try {
     const disabled = await checkIfDisabled();
     if (disabled) return;
@@ -349,8 +365,17 @@ async function coreOperations() {
     const storageData = await getStorage(["websites", "peekDuration"]);
 
     await trackUsage(activeTab.id, activeTab.url, storageData);
-    await checkAndBlock(activeTab.id, activeTab.url, storageData);
-    await updateBadge(activeTab.url, storageData); 
+
+    const normalizedFullPath = normalizeUrl(activeTab.url);
+    if (!normalizedFullPath) return;
+
+    const site = getMatchingSite(normalizedFullPath, storageData.websites || []);
+
+    if (forceAll || (site && calculateTimeLeft(site) <= 0)) {
+      await checkAndBlock(activeTab.id, activeTab.url, storageData, { force: forceAll });
+    }
+
+    await updateBadge(activeTab.id, activeTab.url, storageData, { force: forceAll}); 
 
   } catch (err) { console.error('core operations failed: ', err); }
 };
@@ -394,15 +419,15 @@ function scheduleMidnightReset() {
 
 // Update when tab is activated or updated
 chrome.tabs.onUpdated.addListener(async () => {
-  await coreOperations();
+  await coreOperations({ forceAll: true });
 });
 
 chrome.tabs.onActivated.addListener(async () => {
-  await coreOperations();
+  await coreOperations({ forceAll: true });
 });
 chrome.windows.onFocusChanged.addListener(async (windowId) => { // updates between multiple windows
   if (windowId === chrome.windows.WINDOW_ID_NONE) return; // no window is focused
-  await coreOperations(); 
+  await coreOperations({ forceAll: true }); 
 });
 
 // Clean up state when a tab is closed
@@ -479,6 +504,7 @@ chrome.runtime.onConnect.addListener((port) => {
         isTimerDisabled,
         showTimer
       });
+      console.log('port message:', prevTimerStrings[tabId]?.domainString, prevTimerStrings[tabId]?.timeString );
     } catch {
       console.log('port name timer listener');
       delete timerPorts[tabId];
