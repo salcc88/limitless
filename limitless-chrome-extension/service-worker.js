@@ -91,7 +91,6 @@ function normalizeUrl(url) {
   const normalizedUrl = (fullUrl.hostname.replace("www.", "") + fullUrl.pathname).replace(/\/$/, "");
   return (normalizedUrl);
 }
-
 // get best matching site for a url path
 function getMatchingSite(normalizedUrl, websites) {
   return websites.reduce((best, site) => {
@@ -100,6 +99,13 @@ function getMatchingSite(normalizedUrl, websites) {
     }
     return best;
   }, null);
+}
+function validateWebsite(url, websites) {
+  const normalizedUrl = normalizeUrl(url);
+  if (!normalizedUrl) return null;
+  const matchingSite = getMatchingSite(normalizedUrl, websites);
+  if (!matchingSite) return null;
+  return matchingSite;
 }
 
 function initializeNotificationMap(websites) {
@@ -197,23 +203,16 @@ function updateBigTimerDisable() { // update visiblity vars
 }
 
 // Track usage only for the tab if it's visible
-async function trackUsage(tabId, url, storageData) {
+async function trackUsage(activeTab, websites, site) {
   try {
-    const tab = await chrome.tabs.get(tabId);
-    if (!tab.active || tabVisibility[tabId] === false) return;
-
-    const normalizedFullPath = normalizeUrl(url);
-    if (!normalizedFullPath) return;
-    let websites = storageData.websites || [];
-    const site = getMatchingSite(normalizedFullPath, websites);
-    if (!site) return;
+    if (!site || !activeTab || tabVisibility[activeTab.tabId] === false) return;
 
     const now = Date.now();
     const lastTime = activeTabTimes[tabId] || now;
     const diffMinutes = (now - lastTime) / 1000 / 60;
 
     site.usage = (site.usage || 0) + diffMinutes;
-    activeTabTimes[tabId] = now;
+    activeTabTimes[activeTab.tabId] = now;
 
     chrome.storage.local.set({ websites });
   } catch (err) {
@@ -221,36 +220,31 @@ async function trackUsage(tabId, url, storageData) {
 }
 
 // Update badge for a site
-async function updateBadge(tabId, url, storageData, { force = false } = {}) {
+async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
   if (!tabId) return;
-  console.log('updateBadge');
-  const normalizedFullPath = normalizeUrl(url);
-  if (!normalizedFullPath) return;
-  let websites = storageData.websites || [];
-  const site = getMatchingSite(normalizedFullPath, websites);
+  console.log('update Badge');
 
   let text = "";
   let timeString = "0m";
   let color = blueColor;
   
   if (site) {
-    const timeLeft = calculateTimeLeft(site);
     let numberHours = Math.floor(timeLeft / 60);
     let numberMinutes = Math.floor(timeLeft % 60);
     
     //send notifications for each threshold
     [10, 5, 4, 3, 2, 1].forEach(threshold => {
-      if (!notificationsSent[normalizedFullPath]) {
-        notificationsSent[normalizedFullPath] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false }; // initialize safely
+      if (!notificationsSent[site.domain]) {
+        notificationsSent[site.domain] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false }; // initialize safely
       }
 
       if (
         Math.floor(timeLeft) <= threshold &&
-        !notificationsSent[normalizedFullPath][threshold] &&
+        !notificationsSent[site.domain][threshold] &&
         Math.floor(timeLeft) > threshold - 1
       ) {
         sendTimeLeftNotification(site.domain, threshold);
-        notificationsSent[normalizedFullPath][threshold] = true;
+        notificationsSent[site.domain][threshold] = true;
       }
     });
 
@@ -298,14 +292,8 @@ async function updateBadge(tabId, url, storageData, { force = false } = {}) {
 }
 
 // Block a website if limit reached
-async function checkAndBlock(tabId, url, storageData) {
-  const normalizedFullPath = normalizeUrl(url);
-  if (!normalizedFullPath) return;
-  let websites = storageData.websites || [];
-  const site = getMatchingSite(normalizedFullPath, websites);
+function checkAndBlock(tabId, storageData, timeLeft, site) {
   if (!site) return;
-
-  const timeLeft = calculateTimeLeft(site);
   if (timeLeft > 0) return; // not blocked
 
   const peekDuration = storageData.peekDuration || 0.25; // minutes
@@ -361,21 +349,15 @@ async function coreOperations({ forceAll = false } = {}) {
 
     const activeTab = windowInfo.tabs?.find(tab => tab.active && tab.url);
     if (!activeTab) return;
-
     const storageData = await getStorage(["websites", "peekDuration"]);
+    const site = validateWebsite(activeTab.url, storageData.websites || []);
+    const timeLeft = calculateTimeLeft(site);
 
-    await trackUsage(activeTab.id, activeTab.url, storageData);
-
-    const normalizedFullPath = normalizeUrl(activeTab.url);
-    if (!normalizedFullPath) return;
-
-    const site = getMatchingSite(normalizedFullPath, storageData.websites || []);
-
-    if (forceAll || (site && calculateTimeLeft(site) <= 0)) {
-      await checkAndBlock(activeTab.id, activeTab.url, storageData, { force: forceAll });
+    if (forceAll || (site && timeLeft <= 0)) {
+      checkAndBlock(activeTab.id, storageData, timeLeft, site, { force: forceAll });
     }
-
-    await updateBadge(activeTab.id, activeTab.url, storageData, { force: forceAll}); 
+    await trackUsage(activeTab, storageData.websites, site);
+    await updateBadge(activeTab.id, site, timeLeft, { force: forceAll}); 
 
   } catch (err) { console.error('core operations failed: ', err); }
 };
@@ -398,12 +380,11 @@ async function resetDailyUsage() {
     Object.keys(notificationsSent).forEach(key => {
       notificationsSent[key] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false };
     });
-    
-    // Refresh badge for active tab if necessary
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs[0] && tabs[0].url) {
-      await updateBadge(tabs[0].url, {websites: resetWebsites });
-    }
+  
+    //reset badge and big timer:
+    chrome.action.setBadgeText({ text: ""});
+    chrome.action.setBadgeBackgroundColor(blueColor);
+    updateBigTimerStrings(null, "", "0m", { force: true });
   }
 };
 
@@ -421,7 +402,6 @@ function scheduleMidnightReset() {
 chrome.tabs.onUpdated.addListener(async () => {
   await coreOperations({ forceAll: true });
 });
-
 chrome.tabs.onActivated.addListener(async () => {
   await coreOperations({ forceAll: true });
 });

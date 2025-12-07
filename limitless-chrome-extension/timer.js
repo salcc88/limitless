@@ -22,10 +22,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const timerNumber = document.createElement("h2");
     timerNumber.id = "timer-number";
     timerBox.appendChild(timerNumber);
-    // remove animation class after animation
-    timerNumber.addEventListener("animationend", () => {
-      timerNumber.classList.remove("flash");
-    });
 
     const remainingSpan = document.createElement("span");
     remainingSpan.id = "timer-span";
@@ -113,8 +109,6 @@ document.addEventListener("DOMContentLoaded", () => {
         timeString === "1m" ||
         timeString === "< 1m" ) {
         number.classList.add("flashing");
-      } else { 
-        number.classList.add("flash"); 
       }
     }
     

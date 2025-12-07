@@ -56,9 +56,6 @@
   font-weight: 500;
   color: var(--text);
  }
- #limitless-timer-box h2.flash {
-  animation: flash 600ms ease-out forwards;
- }
  #limitless-timer-box h2.flashing {
   animation: flashing 2000ms ease-out infinite;
  }
@@ -105,11 +102,6 @@
   }
 }
 
-
-@keyframes flash {
-  from { opacity: 0;}
-  to { opacity: 1; }
-}
 @keyframes flashing {
   0%, 50% { opacity: 1; }
   25% { opacity: 0.3; }
