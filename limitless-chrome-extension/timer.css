@@ -21,7 +21,7 @@
   position: fixed;
   top: 20px;
   left: 20px;
-  width: 130px;
+  min-width: 130px;
   box-sizing: border-box !important;
   overflow: hidden;
   padding: 24px 0px 16px 0px;
@@ -40,27 +40,28 @@
 #limitless-timer-box:active {
   cursor: grabbing;
 }
-#limitless-timer-box #domain-span,
-#limitless-timer-box #timer-span { 
+#limitless-timer-box > #limitless-domain-span,
+#limitless-timer-box > #limitless-timer-span { 
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-weight: 500;
   color: var(--gray);
   font-size: 0.9rem !important;
+  padding: 0 4px;
   text-align: center;
 }
-#limitless-timer-box h2 { 
+#limitless-timer-box > #limitless-timer-number { 
   font-size: 2rem !important;
-  line-height: 2rem;
+  line-height: 2rem !important;
   margin: 0;
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-weight: 500;
   color: var(--text);
  }
- #limitless-timer-box h2.flashing {
+ #limitless-timer-box > #limitless-timer-number.flashing {
   animation: flashing 2000ms ease-out infinite;
  }
 
-#limitless-timer-box #close-button {
+#limitless-timer-box > #limitless-close-button {
   position: absolute;
   top: 2px;
   right: 2px;
@@ -78,10 +79,10 @@
   border-radius: 0;
   transition: opacity 150ms;
 }
-#limitless-timer-box #close-button:hover {
+#limitless-timer-box > #limitless-close-button:hover {
   opacity: 0.5;
 }
-#limitless-timer-box #close-button svg line {
+#limitless-timer-box > #limitless-close-button svg line {
   stroke: var(--text);
   stroke-width: 2px;
 }
@@ -97,7 +98,7 @@
 
     border: 3px solid #43DABE; /* blue-highlight */
   }
-  #limitless-timer-box h2 { 
+  #limitless-timer-box > #limitless-timer-number { 
     color: #43DABE;
   }
 }

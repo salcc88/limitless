@@ -1,36 +1,40 @@
 document.addEventListener("DOMContentLoaded", () => {
   // content-scripts/timer.js
-  let timerBox;
+  let timerBox = null;
+  let timerNumber = null;
+  let domainSpan = null;
 
   let timeString = "0m";
   let domainString = "";
   let isTimerDisabled = false;
   let showTimer = true;
 
+  const flashingTimes = new Set(["5m","4m","3m","2m","1m","<1m"]);
+
   function createTimerBox() {
     if (timerBox) return;
 
     timerBox = document.createElement("div");
     timerBox.id = "limitless-timer-box";
-    timerBox.ariaHidden = true;
+    timerBox.setAttribute("aria-hidden", "true");
 
     // inner content
-    const domainSpan = document.createElement("span");
-    domainSpan.id = "domain-span";
+    domainSpan = document.createElement("span");
+    domainSpan.id = "limitless-domain-span";
     timerBox.appendChild(domainSpan);
 
-    const timerNumber = document.createElement("h2");
-    timerNumber.id = "timer-number";
+    timerNumber = document.createElement("h2");
+    timerNumber.id = "limitless-timer-number";
     timerBox.appendChild(timerNumber);
 
     const remainingSpan = document.createElement("span");
-    remainingSpan.id = "timer-span";
+    remainingSpan.id = "limitless-timer-span";
     remainingSpan.textContent = "remaining";
     timerBox.appendChild(remainingSpan);
 
     const closeBtn = document.createElement("button");
-    closeBtn.id = 'close-button';
-    closeBtn.ariaLabel = 'Hide Timer';
+    closeBtn.id = 'limitless-close-button';
+    closeBtn.setAttribute("aria-label", "Hide Timer");
     closeBtn.title = 'Hide Timer';
     closeBtn.innerHTML = `
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none">
@@ -59,7 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Start dragging
     el.addEventListener("mousedown", (e) => {
       // Prevent dragging when clicking the close button
-      if (e.target.id === "close-button" || e.target.closest("#close-button")) return;
+      if (e.target.id === "limitless-close-button" || e.target.closest("#limitless-close-button")) return;
     
       isDragging = true;
       const rect = el.getBoundingClientRect();
@@ -96,23 +100,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (!timerBox) createTimerBox();
-    const number = timerBox.querySelector("#timer-number");
-    const website = timerBox.querySelector("#domain-span");
 
-    if (number.textContent !== timeString) {
-      number.textContent = timeString;
-      if (
-        timeString === "5m" ||
-        timeString === "4m" ||
-        timeString === "3m" ||
-        timeString === "2m" ||
-        timeString === "1m" ||
-        timeString === "< 1m" ) {
-        number.classList.add("flashing");
+    if (timerNumber.textContent !== timeString) {
+      timerNumber.textContent = timeString;
+
+      if (flashingTimes.has(timeString)) {
+        timerNumber.classList.add("flashing");
       }
     }
     
-    website.textContent = domainString;
+    domainSpan.textContent = domainString;
   };
 
   const port = chrome.runtime.connect({ name: "timer" });
@@ -128,14 +125,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   function cleanupTimerBox() {
-    if (!timerBox) return;
-
-    try {
+    if (timerBox) {
       timerBox.remove();
-    } catch (err) {
-      // ignore errors if context is already invalidated
-    } finally {
       timerBox = null;
+      timerNumber = null;
+      domainSpan = null;
     }
   }
 

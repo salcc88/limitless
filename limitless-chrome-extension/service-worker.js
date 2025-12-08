@@ -4,10 +4,13 @@
 
 // In-memory maps
 const activeTabTimes = {}; // last timestamp per active tab
-const tabVisibility = {}; // visibility state per tabId
+const tabEngaged = {}; // engaged state per tabId (active tab + window focus + not minimzed)
 const peekStartTimes = {}; // key: tabId, value: timestamp when peek started
 const peekNotified = {}; // Tracks if user has been notified about peek mode per tabId
 const notificationsSent = {};
+
+let websitesCache = [];
+let websiteChangesMade = false;
 
 // badge state
 const prevBadgeState = {};
@@ -25,11 +28,8 @@ const orangeColor = "#FFC66B";
 const redColor = "#FF6B6B";
 const grayColor = "#1D1D1D";
 
-// check if disabled
 async function getStorage(keys) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(keys, resolve);
-  });
+  return new Promise((resolve) => { chrome.storage.local.get(keys, resolve) });
 }
 function timeStringToMinutes(str) {
   const [h, m] = str.split(":").map(Number);
@@ -76,7 +76,6 @@ async function checkIfDisabled() {
   return isDisabled;
 }
 
-// Calculate remaining time
 function calculateTimeLeft(site) {
   if (!site) return 0;
   return Math.max((site.timeLimit || 0) - (site.usage || 0), 0);
@@ -84,9 +83,7 @@ function calculateTimeLeft(site) {
 
 // get url path with trimmed www. and trailing slash
 function normalizeUrl(url) {
-  if (!url || !url.startsWith("http")) {
-    return null; 
-  }
+  if (!url || !url.startsWith("http")) return null;
   const fullUrl = new URL(url);
   const normalizedUrl = (fullUrl.hostname.replace("www.", "") + fullUrl.pathname).replace(/\/$/, "");
   return (normalizedUrl);
@@ -108,14 +105,6 @@ function validateWebsite(url, websites) {
   return matchingSite;
 }
 
-function initializeNotificationMap(websites) {
-  websites.forEach(site => {
-    const key = site.domain;
-    if (!notificationsSent[key]) {
-      notificationsSent[key] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false };
-    }
-  });
-}
 // Notify the user when X time is left
 function sendTimeLeftNotification(domain, minutesLeft) {
   chrome.notifications.create(`limitless-${domain}-${minutesLeft}`, {
@@ -123,7 +112,7 @@ function sendTimeLeftNotification(domain, minutesLeft) {
     iconUrl: "assets/icons/icon128.png",
     title: "Limitless",
     silent: true,
-    message: `You have ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'} left for ${domain}`,
+    message: `You have ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'} left on ${domain}`,
     priority: 2
   });
 }
@@ -156,8 +145,7 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
     ) {
       try { 
         port.postMessage(timerMessage) 
-        prevTimerStrings[tabId] = timerMessage; 
-        console.log('message stringsbig', timerMessage);
+        prevTimerStrings[tabId] = timerMessage;
       } catch {
         console.warn('couldnt post message updatebigstrings');
         delete timerPorts[tabId];
@@ -170,7 +158,6 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
 function updateBigTimerDisable() { // update visiblity vars
   Object.entries(timerPorts).forEach(([tabId, port]) => {
     if (!port) return;
-    console.log('bigTimerDisable');
 
     const domainString = prevTimerStrings[tabId]?.domainString ?? "";
     const timeString = prevTimerStrings[tabId]?.timeString ?? "0m";
@@ -191,10 +178,8 @@ function updateBigTimerDisable() { // update visiblity vars
     ) {
       try {
         port.postMessage(timerMessage);
-        console.log('message disabledbig', timerMessage);
         prevTimerDisabled[tabId] = { isTimerDisabled, showTimer };
       } catch {
-        console.warn('couldnt post message updatebigdisabel');
         delete timerPorts[tabId];
         delete prevTimerDisabled[tabId];
       }
@@ -202,42 +187,38 @@ function updateBigTimerDisable() { // update visiblity vars
   });
 }
 
-// Track usage only for the tab if it's visible
-async function trackUsage(activeTab, websites, site) {
+// Track usage only for the tab if it's being engaged
+async function trackUsage(tabId, site) {
   try {
-    if (!site || !activeTab || tabVisibility[activeTab.tabId] === false) return;
-
+    console.log('track usage');
     const now = Date.now();
     const lastTime = activeTabTimes[tabId] || now;
     const diffMinutes = (now - lastTime) / 1000 / 60;
 
+    //cached site
     site.usage = (site.usage || 0) + diffMinutes;
-    activeTabTimes[activeTab.tabId] = now;
-
-    chrome.storage.local.set({ websites });
+    activeTabTimes[tabId] = now;
+    websiteChangesMade = true; // set flag for write Updates
   } catch (err) {
   }
 }
 
-// Update badge for a site
+// Update badge for a site and send info to the timer
 async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
-  if (!tabId) return;
-  console.log('update Badge');
-
+  console.log('update badge');
   let text = "";
   let timeString = "0m";
   let color = blueColor;
-  
+
   if (site) {
     let numberHours = Math.floor(timeLeft / 60);
     let numberMinutes = Math.floor(timeLeft % 60);
     
-    //send notifications for each threshold
+    //send notifications for each threshold, prevent spam within minute thresholds
     [10, 5, 4, 3, 2, 1].forEach(threshold => {
       if (!notificationsSent[site.domain]) {
-        notificationsSent[site.domain] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false }; // initialize safely
+        notificationsSent[site.domain] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false };
       }
-
       if (
         Math.floor(timeLeft) <= threshold &&
         !notificationsSent[site.domain][threshold] &&
@@ -264,53 +245,47 @@ async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
       } else if (timeLeft % 60 > 0) {
         text = "<1m";
         color = redColor;
-      }
-      else {
+      } else {
         text = "0m";
         color = grayColor;
       }
       timeString = text;
     }
-  } else {
+
+    updateBigTimerStrings(tabId, site.domain, timeString, { force });
+
+  } else { // for when !site and forced
     text = "";
     color = blueColor;
     timeString = "0m"
   }
 
   const prev = prevBadgeState[tabId] || {};
-  console.log('is setting badge?', prev.text !== text || force);
   if (force || prev.text !== text) {
     chrome.action.setBadgeText({ text });
     chrome.action.setBadgeBackgroundColor({ color });
     prevBadgeState[tabId] = {text};
   }
-
-  if (site) {
-    console.log('bigTimerStrings', site.domain, timeString);
-    updateBigTimerStrings(tabId, site.domain, timeString, { force });
-  }
 }
 
 // Block a website if limit reached
-function checkAndBlock(tabId, storageData, timeLeft, site) {
-  if (!site) return;
-  if (timeLeft > 0) return; // not blocked
+async function blockWebsite(tabId, site) {
 
-  const peekDuration = storageData.peekDuration || 0.25; // minutes
-
-  if (site.peekMode) { // peek mode delay before block
+  if (site.peekMode) { // peek mode delay before block, fix later
     const now = Date.now();
     if (!peekStartTimes[tabId]) {
       peekStartTimes[tabId] = now;
       peekNotified[tabId] = false;
     }
 
+    const data = await getStorage(["peekDuration"]);
+
     // Notify ONCE when Peek Mode begins
     if (!peekNotified[tabId]) {
       const text =
-        peekDuration < 1 
-        ? `${peekDuration * 60} seconds`
-        : `${peekDuration > 1 ? "2 minutes" : "minute"}`
+        data.peekDuration < 1 
+        ? `${data.peekDuration * 60} seconds`
+        : `${data.peekDuration} minute`
       chrome.notifications.create(`limitless-peek-${tabId}`, {
         type: "basic",
         iconUrl: "assets/icons/icon128.png",
@@ -323,7 +298,7 @@ function checkAndBlock(tabId, storageData, timeLeft, site) {
     }
 
     const elapsedPeekTime = (now - peekStartTimes[tabId]) / 1000 / 60;
-    if (elapsedPeekTime >= peekDuration) { // block site after peek time
+    if (elapsedPeekTime >= data.peekDuration) { // block site after peek time
       chrome.tabs.update(tabId, {
         url: chrome.runtime.getURL(`blockedScreen/index.html?site=${site.domain}`)
       });
@@ -338,8 +313,7 @@ function checkAndBlock(tabId, storageData, timeLeft, site) {
 
 async function coreOperations({ forceAll = false } = {}) {
   try {
-    const disabled = await checkIfDisabled();
-    if (disabled) return;
+    if (await checkIfDisabled()) return;
 
     const windowInfo = await chrome.windows.getCurrent({ populate: true }).catch(err => {
       if (err.message.includes("No current window")) return null;
@@ -349,43 +323,57 @@ async function coreOperations({ forceAll = false } = {}) {
 
     const activeTab = windowInfo.tabs?.find(tab => tab.active && tab.url);
     if (!activeTab) return;
-    const storageData = await getStorage(["websites", "peekDuration"]);
-    const site = validateWebsite(activeTab.url, storageData.websites || []);
+
+    const site = validateWebsite(activeTab.url, websitesCache || []);
     const timeLeft = calculateTimeLeft(site);
 
-    if (forceAll || (site && timeLeft <= 0)) {
-      checkAndBlock(activeTab.id, storageData, timeLeft, site, { force: forceAll });
+    if (site) { console.log('core operations go', tabEngaged[activeTab.id]); }
+
+    if (forceAll || site && tabEngaged[activeTab.id]) {
+      await updateBadge(activeTab.id, site, timeLeft, { force: forceAll});
     }
-    await trackUsage(activeTab, storageData.websites, site);
-    await updateBadge(activeTab.id, site, timeLeft, { force: forceAll}); 
+    if (site && tabEngaged[activeTab.id]) {
+      if (timeLeft <= 0) {
+        await blockWebsite(activeTab.id, site);
+      }
+      await trackUsage(activeTab.id, site);
+    }
 
   } catch (err) { console.error('core operations failed: ', err); }
 };
 
+async function writeUpdates() {
+  if (websiteChangesMade) {
+    console.log('Writing Updates!')
+    await new Promise(resolve =>
+      chrome.storage.local.set({ websites: websitesCache }, resolve)
+    );
+    websiteChangesMade = false;
+  }
+}
+
 async function resetDailyUsage() {
   const today = new Date().toDateString();
-  const storageData = await getStorage(["websites", "lastReset"]);
+  const data = await getStorage(["websites", "lastReset"]);
+  if (data.lastReset === today) return; // not a new day yet
 
-  if (storageData.lastReset !== today) {
-    const websites = storageData.websites || [];
-    const resetWebsites = websites.map(site => ({ 
-      ...site, 
-      usage: 0
-    }));
+  const websites = data.websites || [];
+  const resetWebsites = websites.map(site => ({ 
+    ...site, 
+    usage: 0
+  }));
 
-    await new Promise((resolve) =>
-      chrome.storage.local.set({ websites: resetWebsites, lastReset: today }, resolve)
-    );
+  // reset cache and storage
+  websitesCache = resetWebsites;
+  await new Promise((resolve) => chrome.storage.local.set({ websites: resetWebsites, lastReset: today }, resolve));
 
-    Object.keys(notificationsSent).forEach(key => {
-      notificationsSent[key] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false };
-    });
-  
-    //reset badge and big timer:
-    chrome.action.setBadgeText({ text: ""});
-    chrome.action.setBadgeBackgroundColor(blueColor);
-    updateBigTimerStrings(null, "", "0m", { force: true });
-  }
+  // reset notification log
+  Object.keys(notificationsSent).forEach(key => { delete notificationsSent[key] });
+
+  //reset badge and big timer:
+  chrome.action.setBadgeText({ text: "" });
+  chrome.action.setBadgeBackgroundColor({ color: blueColor });
+  updateBigTimerStrings(null, "", "0m", { force: true });
 };
 
 // Schedule next midnight alarm
@@ -399,11 +387,14 @@ function scheduleMidnightReset() {
 }
 
 // Update when tab is activated or updated
-chrome.tabs.onUpdated.addListener(async () => {
-  await coreOperations({ forceAll: true });
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => { // calls on reload, url change
+  if (changeInfo.status === "loading") { // might not have valid url when loadng TODO
+    await coreOperations({ forceAll: true });
+  }
 });
-chrome.tabs.onActivated.addListener(async () => {
+chrome.tabs.onActivated.addListener(async () => { // Force to keep timers displaying
   await coreOperations({ forceAll: true });
+  await writeUpdates(); // fresh sync on tab switch
 });
 chrome.windows.onFocusChanged.addListener(async (windowId) => { // updates between multiple windows
   if (windowId === chrome.windows.WINDOW_ID_NONE) return; // no window is focused
@@ -414,25 +405,37 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => { // updates betwe
 chrome.tabs.onRemoved.addListener((tabId) => {
   delete peekStartTimes[tabId];
   delete peekNotified[tabId];
-  delete tabVisibility[tabId];
+  delete tabEngaged[tabId];
   delete activeTabTimes[tabId];
 });
 
 // send disabled status to popup and listen for visiblity messages
 chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
-  if (msg.type === "tabVisibility" && sender.tab) {
-    tabVisibility[sender.tab.id] = !!msg.visible;
+  if (msg.type === "tabEngaged") {
+    console.log('Report Engaged State', msg.engaged);
+    tabEngaged[sender.tab.id] = !!msg.engaged;
     activeTabTimes[sender.tab.id] = Date.now(); // reset last active time
     return false;
   }
   if (msg.type === "disableShowTimer") {
     showTimer = false;
   }
+  if (msg.type === "dashWebsitesUpdated") {
+    const data = await getStorage(["websites"]);
+    const updatedWebsites = data.websites || [];
+    websitesCache = updatedWebsites.map(updatedSite => {
+      const existingSite = (websitesCache || []).find(site => site.domain === updatedSite.domain);
+      return {
+        ...updatedSite,
+        usage: existingSite?.usage ?? 0 // preserve usage if it exists
+      };
+    });
+  }
 });
 
-// Periodic badge updates for active tab
 chrome.runtime.onInstalled.addListener(async () => {
   chrome.alarms.create("updateAll", { periodInMinutes: 5 / 60 }); // every 5 seconds
+  chrome.alarms.create("writeAll", { periodInMinutes: 15 / 60 }); // every 15 seconds
 
   chrome.notifications.create(`limitless-install`, {
     type: "basic",
@@ -445,26 +448,21 @@ chrome.runtime.onInstalled.addListener(async () => {
   });
 
   const today = new Date().toDateString(); // Initialize lastReset date
-  const storageData = await getStorage(["lastReset", "websites"]);
-  initializeNotificationMap(storageData.websites || []);
-
-  if (!storageData.lastReset) {
-    chrome.storage.local.set({ lastReset: today });
-  }
+  chrome.storage.local.set({ lastReset: today });
   scheduleMidnightReset(); // schedule next reset
 });
 
 chrome.runtime.onStartup.addListener( async () => {
-  await resetDailyUsage(); // check for reset on browser startup
-  scheduleMidnightReset(); // schedule next reset
-  const storageData = await getStorage(["websites"]);
-  initializeNotificationMap(storageData.websites || []);
+  const data = await getStorage(["websites"]);
+  websitesCache = data.websites || [];
+  await resetDailyUsage(); // check for pending reset on browser startup
+  scheduleMidnightReset(); 
 });
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "popup") {
     (async () => {
-      // Get the latest status right when the popup connects
+      // Get status right when the popup connects
       const status = await checkIfDisabled();
       try { port.postMessage({ type: "updateStatusInPopup", disabledStatus: status }); }
       catch (err) { console.error(err) }
@@ -484,17 +482,18 @@ chrome.runtime.onConnect.addListener((port) => {
         isTimerDisabled,
         showTimer
       });
-      console.log('port message:', prevTimerStrings[tabId]?.domainString, prevTimerStrings[tabId]?.timeString );
     } catch {
-      console.log('port name timer listener');
       delete timerPorts[tabId];
       delete timerStrings[tabId];
     }
 
     // Clean up on disconnect
     port.onDisconnect.addListener(() => {
-      const err = chrome.runtime.lastError; // ← THIS IS THE IMPORTANT PART
-      if (err) console.warn("Port disconnect error:", err.message);
+      try {
+        if (chrome.runtime.lastError) {
+          console.warn("Port disconnect error:", err.message);
+        }
+      } catch (err) {}
       delete timerPorts[tabId];
       delete timerStrings[tabId];
     });
@@ -503,10 +502,10 @@ chrome.runtime.onConnect.addListener((port) => {
 
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === "updateAll") {
-    await coreOperations();
-  } else if (alarm.name === "midnightReset") {
-    resetDailyUsage();
+  if (alarm.name === "midnightReset") {
+    await resetDailyUsage();
     scheduleMidnightReset(); // schedule for the next midnight
-  }
+    return;
+  } else if (alarm.name === "updateAll") { await coreOperations() }
+  if (alarm.name === "writeAll") { await writeUpdates() }
 });

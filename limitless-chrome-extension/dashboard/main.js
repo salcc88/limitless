@@ -146,7 +146,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function saveConfiguration(key, value) {
-    chrome.storage.local.set({ [key]: value});
+    chrome.storage.local.set({ [key]: value }, () => {
+      if (key === "websites") { 
+        chrome.runtime.sendMessage({ type: "dashWebsitesUpdated" });
+      }
+    });
   }
 
   const limitTimesFragment = document.createDocumentFragment();
@@ -182,7 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const timeSelect = document.createElement("select"); // time limit
         timeSelect.id = "time-select" + index;
-        timeSelect.ariaLabel = "Daily time limit.";
+        timeSelect.setAttribute("aria-label", "Daily Time Limit");
         timeSelect.classList.add("base-text");
         timeSelect.dataset.type = "timeSelect";
         timeSelect.appendChild(limitTimesFragment.cloneNode(true));
@@ -194,7 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const peekCheckbox = document.createElement("input");
         peekCheckbox.type = "checkbox";
-        peekCheckbox.ariaLabel = "Toggle Peek Mode.";
+        peekCheckbox.setAttribute("aria-label", "Toggle Peek Mode");
         peekCheckbox.id = "peek-check" + index;
         peekCheckbox.checked = !!site.peekMode;
         peekCheckbox.dataset.type = "peekCheckbox";
