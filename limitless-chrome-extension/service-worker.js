@@ -125,6 +125,7 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
 
   Object.entries(timerPorts).forEach(([tabId, port]) => {
     if (!port) return;
+    console.log('big timer strings');
 
     const { domainString: domain = "", timeString: time = "0m" } = timerStrings[tabId] || {};
 
@@ -206,43 +207,43 @@ async function trackUsage(tabId, site) {
 // Update badge for a site and send info to the timer
 async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
   console.log('update badge');
-  let text = "";
-  let timeString = "0m";
-  let color = blueColor;
+  const timeLeftFloor = Math.floor(timeLeft);
+  let numberHours = Math.floor(timeLeftFloor / 60);
+  let numberMinutes = timeLeftFloor % 60;
 
-  if (site) {
-    let numberHours = Math.floor(timeLeft / 60);
-    let numberMinutes = Math.floor(timeLeft % 60);
-    
-    //send notifications for each threshold, prevent spam within minute thresholds
+  //send notifications for each threshold, prevent spam within minute thresholds
+  if (site && timeLeftFloor > 0 && timeLeftFloor <= 10) {
+    if (!notificationsSent[site.domain]) {
+      notificationsSent[site.domain] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false };
+    }
+
     [10, 5, 4, 3, 2, 1].forEach(threshold => {
-      if (!notificationsSent[site.domain]) {
-        notificationsSent[site.domain] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false };
-      }
       if (
-        Math.floor(timeLeft) <= threshold &&
+        timeLeftFloor <= threshold &&
         !notificationsSent[site.domain][threshold] &&
-        Math.floor(timeLeft) > threshold - 1
+        timeLeftFloor > threshold - 1
       ) {
         sendTimeLeftNotification(site.domain, threshold);
         notificationsSent[site.domain][threshold] = true;
       }
     });
+  }
 
-    //Badge logic
+  // badge and timer string logic
+  let text = "";
+  let timeString = "0m";
+  let color = blueColor;
+
+  if (site) {
     if (numberHours > 0) {
-      if (numberMinutes > 0) {
-        text = `${numberHours}h${String(numberMinutes).padStart(2, "0")}`;
-        timeString = `${numberHours}h ${numberMinutes}m`; // for timer
-      } else {
-        text = `${numberHours}h`;
-        timeString = text;
-      } 
-    } else { // if no hour
-      if (timeLeft % 60 >= 1) {
+      text = numberMinutes > 0 ? `${numberHours}h${String(numberMinutes).padStart(2, "0")}` : `${numberHours}h`;
+      timeString = numberMinutes > 0 ? `${numberHours}h ${numberMinutes}m` : text;
+      color = blueColor;
+    } else {
+      if (timeLeftFloor >= 1) {
         text = `${numberMinutes}m`;
-        if (numberMinutes <= 10) { color = orangeColor; }
-      } else if (timeLeft % 60 > 0) {
+        color = numberMinutes <= 10 ? orangeColor : blueColor;
+      } else if (timeLeft > 0) {
         text = "<1m";
         color = redColor;
       } else {
@@ -252,14 +253,17 @@ async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
       timeString = text;
     }
 
-    updateBigTimerStrings(tabId, site.domain, timeString, { force });
+    const prevTimer = prevTimerStrings[tabId];
+    if (force || !prevTimer || prevTimer.timeString !== timeString) {
+      updateBigTimerStrings(tabId, site.domain, timeString, { force });
+    }
 
-  } else { // for when !site and forced
+  } else { // !site or forced
     text = "";
+    timeString = "0m";
     color = blueColor;
-    timeString = "0m"
   }
-
+    
   const prev = prevBadgeState[tabId] || {};
   if (force || prev.text !== text) {
     chrome.action.setBadgeText({ text });
@@ -269,7 +273,7 @@ async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
 }
 
 // Block a website if limit reached
-async function blockWebsite(tabId, site) {
+async function blockWebsite(tabId, site) { // needs force for edge case change limit then switch tab
 
   if (site.peekMode) { // peek mode delay before block, fix later
     const now = Date.now();
@@ -315,6 +319,11 @@ async function coreOperations({ forceAll = false } = {}) {
   try {
     if (await checkIfDisabled()) return;
 
+    if (!forceAll) { // exit if no engaged tabs
+      const activeTabId = Object.keys(tabEngaged).find(id => tabEngaged[id]);
+      if (!activeTabId) return;
+    }
+
     const windowInfo = await chrome.windows.getCurrent({ populate: true }).catch(err => {
       if (err.message.includes("No current window")) return null;
       throw err;
@@ -327,15 +336,15 @@ async function coreOperations({ forceAll = false } = {}) {
     const site = validateWebsite(activeTab.url, websitesCache || []);
     const timeLeft = calculateTimeLeft(site);
 
-    if (site) { console.log('core operations go', tabEngaged[activeTab.id]); }
+    console.log('core operations go', tabEngaged[activeTab.id]);
 
     if (forceAll || site && tabEngaged[activeTab.id]) {
+      if (site && timeLeft <= 0) {
+        await blockWebsite(activeTab.id, site);
+      }
       await updateBadge(activeTab.id, site, timeLeft, { force: forceAll});
     }
     if (site && tabEngaged[activeTab.id]) {
-      if (timeLeft <= 0) {
-        await blockWebsite(activeTab.id, site);
-      }
       await trackUsage(activeTab.id, site);
     }
 
