@@ -38,6 +38,7 @@ html {
   font-weight: 500;
   margin: 0;
   padding: 0;
+  background-color: var(--gray);
 }
 body {
   padding: 0;
@@ -55,6 +56,10 @@ h1, h2, h3 {
 h1 { font-size: 4rem; }
 h2 { font-size: 2rem; }
 h3 { font-size: 1.2rem; }
+
+a, a:visited {
+  color: var(--text);
+}
 
 .base-text {
   font-size: 1rem;
@@ -449,7 +454,7 @@ footer {
   flex-direction: column;
   justify-content: center; 
   align-items: center; 
-  height: 100vh; 
+  height: 100vh;
   background: var(--blue);
   gap: 16px;
 }
@@ -457,8 +462,21 @@ footer {
   width: 150px;
   height: 150px;
 }
-.blocked-wrap h1, .blocked-wrap h2 {
+.blocked-wrap h1, 
+.blocked-wrap h2,
+#peek-message,
+#peek-link,
+#peek-link:visited {
   color: var(--bg);
+}
+.blocked-space {
+  display: flex;
+  align-items: flex-end;
+  flex-grow: 1;
+  padding-bottom: 4rem;
+}
+#peek-message {
+  display: none; /* default */
 }
 
 
@@ -468,9 +486,12 @@ footer {
 
 /*************************/
 
-/*
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  html {
+    background-color: unset;
+  }
+  /*:root {
     --text: #FFFFFF;
     --gray: #a4b7b4;
     --bg: #1D1D1D;
@@ -482,9 +503,9 @@ footer {
   }
   .toggle-switch .switch-slider {
     background-color: var(--gray);
-  }
+  } */
 }
-*/
+
 
 @media screen and (max-width: 1400px) {
   #dashboard-wrap {

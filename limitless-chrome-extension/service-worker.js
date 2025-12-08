@@ -6,8 +6,9 @@
 const activeTabTimes = {}; // last timestamp per active tab
 const tabEngaged = {}; // engaged state per tabId (active tab + window focus + not minimzed)
 const peekStartTimes = {}; // key: tabId, value: timestamp when peek started
-const peekNotified = {}; // Tracks if user has been notified about peek mode per tabId
 const notificationsSent = {};
+const blockedUrl = {}
+const activePeeks = {}
 
 let websitesCache = [];
 let websiteChangesMade = false;
@@ -103,6 +104,32 @@ function validateWebsite(url, websites) {
   const matchingSite = getMatchingSite(normalizedUrl, websites);
   if (!matchingSite) return null;
   return matchingSite;
+}
+
+function startPeek(tabId, durationMinutes) {
+  const originalUrl = blockedUrl[tabId];
+  if (!originalUrl) return;
+
+  // Create a new Peek Session
+  activePeeks[tabId] = {
+    startedAt: Date.now(),
+    duration: durationMinutes
+  };
+
+  const text =
+    durationMinutes < 1 
+    ? `${durationMinutes * 60} seconds`
+    : `minute`
+  chrome.notifications.create(`limitless-peek-${tabId}`, {
+    type: "basic",
+    iconUrl: "assets/icons/icon128.png",
+    title: "Limitless",
+    silent: true,
+    message: `You're in Peek Mode for the next ${text}`,
+    priority: 2
+  });
+
+  chrome.tabs.update(tabId, { url: originalUrl });
 }
 
 // Notify the user when X time is left
@@ -273,54 +300,34 @@ async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
 }
 
 // Block a website if limit reached
-async function blockWebsite(tabId, site) { // needs force for edge case change limit then switch tab
+async function blockWebsite(activeTab, site) {
 
-  if (site.peekMode) { // peek mode delay before block, fix later
-    const now = Date.now();
-    if (!peekStartTimes[tabId]) {
-      peekStartTimes[tabId] = now;
-      peekNotified[tabId] = false;
-    }
+  const activePeek = activePeeks[activeTab.id];
+  if (activePeek) {
+    const elapsed = (Date.now() - activePeek.startedAt) / 1000 / 60;
 
-    const data = await getStorage(["peekDuration"]);
-
-    // Notify ONCE when Peek Mode begins
-    if (!peekNotified[tabId]) {
-      const text =
-        data.peekDuration < 1 
-        ? `${data.peekDuration * 60} seconds`
-        : `${data.peekDuration} minute`
-      chrome.notifications.create(`limitless-peek-${tabId}`, {
-        type: "basic",
-        iconUrl: "assets/icons/icon128.png",
-        title: "Limitless",
-        silent: true,
-        message: `You're in Peek Mode for the next ${text}`,
-        priority: 2
+    if (elapsed >= activePeek.duration) {
+      delete activePeeks[activeTab.id];
+      blockedUrl[activeTab.id] = activeTab.url;
+      chrome.tabs.update(activeTab.id, {
+        url: chrome.runtime.getURL(`blockedScreen/index.html?pm=${site.peekMode}&site=${site.domain}`)
       });
-      peekNotified[tabId] = true;
     }
+    return;
+  }
 
-    const elapsedPeekTime = (now - peekStartTimes[tabId]) / 1000 / 60;
-    if (elapsedPeekTime >= data.peekDuration) { // block site after peek time
-      chrome.tabs.update(tabId, {
-        url: chrome.runtime.getURL(`blockedScreen/index.html?site=${site.domain}`)
-      });
-      delete peekStartTimes[tabId]; // reset for next peek
-    }
-  } else { // No peek mode, block immediately
-    chrome.tabs.update(tabId, {
-      url: chrome.runtime.getURL(`blockedScreen/index.html?site=${site.domain}`)
-    });
-  };
+  blockedUrl[activeTab.id] = activeTab.url;
+  chrome.tabs.update(activeTab.id, {
+    url: chrome.runtime.getURL(`blockedScreen/index.html?pm=${site.peekMode}&site=${site.domain}`)
+  });
 };
 
 async function coreOperations({ forceAll = false } = {}) {
   try {
     if (await checkIfDisabled()) return;
 
-    if (!forceAll) { // exit if no engaged tabs
-      const activeTabId = Object.keys(tabEngaged).find(id => tabEngaged[id]);
+    if (!forceAll) { // exit if no engaged tabs or active peeks and not forced
+      const activeTabId = Object.keys(tabEngaged).find(id => tabEngaged[id] || activePeeks[id]);
       if (!activeTabId) return;
     }
 
@@ -338,13 +345,15 @@ async function coreOperations({ forceAll = false } = {}) {
 
     console.log('core operations go', tabEngaged[activeTab.id]);
 
-    if (forceAll || site && tabEngaged[activeTab.id]) {
+    const isEngagedOrPeek = tabEngaged[activeTab.id] || activePeeks[activeTab.id];
+
+    if (forceAll || site && isEngagedOrPeek) {
       if (site && timeLeft <= 0) {
-        await blockWebsite(activeTab.id, site);
+        await blockWebsite(activeTab, site);
       }
       await updateBadge(activeTab.id, site, timeLeft, { force: forceAll});
     }
-    if (site && tabEngaged[activeTab.id]) {
+    if (site && isEngagedOrPeek) {
       await trackUsage(activeTab.id, site);
     }
 
@@ -413,18 +422,21 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => { // updates betwe
 // Clean up state when a tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
   delete peekStartTimes[tabId];
-  delete peekNotified[tabId];
   delete tabEngaged[tabId];
   delete activeTabTimes[tabId];
 });
 
 // send disabled status to popup and listen for visiblity messages
-chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(async (msg, sender) => {
   if (msg.type === "tabEngaged") {
     console.log('Report Engaged State', msg.engaged);
     tabEngaged[sender.tab.id] = !!msg.engaged;
     activeTabTimes[sender.tab.id] = Date.now(); // reset last active time
-    return false;
+  }
+  if (msg.type === "startPeek") {
+    const tabId = sender.tab?.id;
+    if (!tabId || !blockedUrl[tabId]) return;
+    startPeek(tabId, msg.duration);
   }
   if (msg.type === "disableShowTimer") {
     showTimer = false;
