@@ -234,21 +234,21 @@ async function trackUsage(tabId, site) {
 // Update badge for a site and send info to the timer
 async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
   console.log('update badge');
-  const timeLeftFloor = Math.floor(timeLeft);
-  let numberHours = Math.floor(timeLeftFloor / 60);
-  let numberMinutes = timeLeftFloor % 60;
+  const timeLeftCeil = Math.ceil(timeLeft);
+  let numberHours = Math.floor(timeLeftCeil / 60);
+  let numberMinutes = timeLeftCeil % 60;
 
   //send notifications for each threshold, prevent spam within minute thresholds
-  if (site && timeLeftFloor > 0 && timeLeftFloor <= 10) {
+  if (site && timeLeftCeil > 0 && timeLeftCeil <= 10) {
     if (!notificationsSent[site.domain]) {
       notificationsSent[site.domain] = { 10: false, 5: false, 4: false, 3: false, 2: false, 1: false };
     }
 
     [10, 5, 4, 3, 2, 1].forEach(threshold => {
       if (
-        timeLeftFloor <= threshold &&
+        timeLeftCeil <= threshold &&
         !notificationsSent[site.domain][threshold] &&
-        timeLeftFloor > threshold - 1
+        timeLeftCeil > threshold - 1
       ) {
         sendTimeLeftNotification(site.domain, threshold);
         notificationsSent[site.domain][threshold] = true;
@@ -267,11 +267,11 @@ async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
       timeString = numberMinutes > 0 ? `${numberHours}h ${numberMinutes}m` : text;
       color = blueColor;
     } else {
-      if (timeLeftFloor >= 1) {
+      if (timeLeftCeil > 1) {
         text = `${numberMinutes}m`;
         color = numberMinutes <= 10 ? orangeColor : blueColor;
-      } else if (timeLeft > 0) {
-        text = "<1m";
+      } else if (timeLeftCeil === 1) {
+        text = "1m";
         color = redColor;
       } else {
         text = "0m";
@@ -341,13 +341,13 @@ async function coreOperations({ forceAll = false } = {}) {
     if (!activeTab) return;
 
     const site = validateWebsite(activeTab.url, websitesCache || []);
-    const timeLeft = calculateTimeLeft(site);
-
     console.log('core operations go', tabEngaged[activeTab.id]);
 
     const isEngagedOrPeek = tabEngaged[activeTab.id] || activePeeks[activeTab.id];
 
     if (forceAll || site && isEngagedOrPeek) {
+      const timeLeft = calculateTimeLeft(site);
+
       if (site && timeLeft <= 0) {
         await blockWebsite(activeTab, site);
       }

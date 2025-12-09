@@ -8,7 +8,7 @@ let domainString = "";
 let isTimerDisabled = false;
 let showTimer = true;
 
-const flashingTimes = new Set(["5m","4m","3m","2m","1m","<1m"]);
+const flashingTimes = new Set(["5m","4m","3m","2m","1m"]);
 
 let dragState = { isDragging: false, el: null, offsetX: 0, offsetY: 0 };
 document.addEventListener("mousemove", (e) => {

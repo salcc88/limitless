@@ -219,7 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
         timeLeftSpan.dataset.type = "timeLeft";
         const usage = Number(site.usage || 0);
         const timeLimit = Number(site.timeLimit || 0);
-        const remaining = Math.floor(Math.max(timeLimit - usage, 0));
+        const remaining = Math.ceil(Math.max(timeLimit - usage, 0));
         timeLeftSpan.textContent = `${remaining} min`;
 
         li.append(domainSpan, timeSelect, toggleWrapper, timeLeftSpan, deleteBtn);
@@ -239,7 +239,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (timeLeftSpan) {
           const usage = Number(site.usage || 0);
           const timeLimit = Number(site.timeLimit || 0);
-          timeLeftSpan.textContent = `${Math.floor(Math.max(timeLimit - usage, 0))} min`;
+          timeLeftSpan.textContent = `${Math.ceil(Math.max(timeLimit - usage, 0))} min`;
         }
       });
     }
@@ -300,7 +300,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const timeSpan = li.querySelector('[data-type="timeLeft"]');
         if (timeSpan) {
           const usage = Number(site.usage || 0);
-          const remaining = Math.floor(Math.max(site.timeLimit - usage, 0));
+          const remaining = Math.ceil(Math.max(site.timeLimit - usage, 0));
           timeSpan.textContent = `${remaining} min`;
         }
         return;
