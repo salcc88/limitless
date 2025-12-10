@@ -16,6 +16,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const startSelect = document.getElementById("start-select");
   const endSelect = document.getElementById("end-select");
 
+  // copyright
+  const year = new Date().getFullYear();
+  document.getElementById("copyright").textContent = `Created by Sal Costa \u00A9 ${year}`;
+
   let websites = [];
   let peekDuration = 0.25; // default 15 seconds
   let weekScheduleMask = 0b0000000;
@@ -114,8 +118,10 @@ document.addEventListener("DOMContentLoaded", () => {
       };
       // initialize to defaults if not found
       for (const [key, defaultValue] of Object.entries(defaults)) {
-        const value = (typeof data[key] === "undefined") ? defaultValue : data[key];
-        if (typeof data[key] === "undefined") {
+        const isUndefined = typeof data[key] === "undefined";
+        const value = isUndefined ? defaultValue : data[key];
+        
+        if (isUndefined) {
           chrome.storage.local.set({ [key]: defaultValue });
         }
       
@@ -375,6 +381,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // update timer toggle UI when X button is clicked on timer
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === "disableShowTimer") {
+      showTimer = false;
       if (timerToggle) timerToggle.checked = false;
     }
   });

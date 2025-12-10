@@ -2,29 +2,32 @@
 // Copyright 2025 Sal Costa
 // https://salcosta.dev
 
-// In-memory maps
+const debugLogs = true;
+
+// In-memory maps, using tabs as keys
 const activeTabTimes = {}; // last timestamp per active tab
 const tabEngaged = {}; // engaged state per tabId (active tab + window focus + not minimzed)
-const peekStartTimes = {}; // key: tabId, value: timestamp when peek started
-const notificationsSent = {};
-const blockedUrl = {}
-const activePeeks = {}
+const notificationsSent = {}; // notifiation records for X time left
+const blockedUrl = {}; // tab url that gets blocked
+const activePeeks = {}; // tabs actively in peek mode
 
 let websitesCache = [];
 let websiteChangesMade = false;
+
+let coreOpsRunning = false; 
 
 // badge state
 const prevBadgeState = {};
 
 // Timer state
 const timerPorts = {};
-const timerStrings = {}
-const prevTimerStrings = {}
-let isTimerDisabled = false;  // whether timers are currently disabled
-let showTimer = true;       // whether to show timer (from storage)
+const timerStrings = {};
+const prevTimerStrings = {};
+let isTimerDisabled = false;
+let showTimer = true;
 const prevTimerDisabled = {}
 
-const blueColor = "#75f8e0";
+const blueColor = "#75f8e0"; // Extra bright blue
 const orangeColor = "#FFC66B";
 const redColor = "#FF6B6B";
 const grayColor = "#1D1D1D";
@@ -116,6 +119,8 @@ function startPeek(tabId, durationMinutes) {
     duration: durationMinutes
   };
 
+  chrome.tabs.update(tabId, { url: originalUrl });
+
   const text =
     durationMinutes < 1 
     ? `${durationMinutes * 60} seconds`
@@ -128,8 +133,6 @@ function startPeek(tabId, durationMinutes) {
     message: `You're in Peek Mode for the next ${text}`,
     priority: 2
   });
-
-  chrome.tabs.update(tabId, { url: originalUrl });
 }
 
 // Notify the user when X time is left
@@ -152,7 +155,6 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
 
   Object.entries(timerPorts).forEach(([tabId, port]) => {
     if (!port) return;
-    console.log('big timer strings');
 
     const { domainString: domain = "", timeString: time = "0m" } = timerStrings[tabId] || {};
 
@@ -163,6 +165,8 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
       isTimerDisabled,
       showTimer
     }
+
+    if (debugLogs) console.log('big timer strings', timerMessage.domainString, timerMessage.timeString);
 
     const prev = prevTimerStrings[tabId];
     if (
@@ -175,7 +179,6 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
         port.postMessage(timerMessage) 
         prevTimerStrings[tabId] = timerMessage;
       } catch {
-        console.warn('couldnt post message updatebigstrings');
         delete timerPorts[tabId];
         delete timerStrings[tabId];
         delete prevTimerStrings[tabId];
@@ -218,7 +221,7 @@ function updateBigTimerDisable() { // update visiblity vars
 // Track usage only for the tab if it's being engaged
 async function trackUsage(tabId, site) {
   try {
-    console.log('track usage');
+    if (debugLogs) console.log('track usage', site?.domain, site?.usage);
     const now = Date.now();
     const lastTime = activeTabTimes[tabId] || now;
     const diffMinutes = (now - lastTime) / 1000 / 60;
@@ -233,7 +236,7 @@ async function trackUsage(tabId, site) {
 
 // Update badge for a site and send info to the timer
 async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
-  console.log('update badge');
+  if (debugLogs) console.log('update badge', site?.domain, site?.usage);
   const timeLeftCeil = Math.ceil(timeLeft);
   let numberHours = Math.floor(timeLeftCeil / 60);
   let numberMinutes = timeLeftCeil % 60;
@@ -323,12 +326,22 @@ async function blockWebsite(activeTab, site) {
 };
 
 async function coreOperations({ forceAll = false } = {}) {
+  if (coreOpsRunning) return;
+  coreOpsRunning = true;
+  
   try {
-    if (await checkIfDisabled()) return;
+    if (await checkIfDisabled()) {
+      return;
+    }
 
     if (!forceAll) { // exit if no engaged tabs or active peeks and not forced
-      const activeTabId = Object.keys(tabEngaged).find(id => tabEngaged[id] || activePeeks[id]);
-      if (!activeTabId) return;
+      const activeTabId = Object.keys(tabEngaged).find(id => {
+        const numId = Number(id);
+        return tabEngaged[numId] || activePeeks[numId];
+      });
+      if (!activeTabId) {
+        return;
+      }
     }
 
     const windowInfo = await chrome.windows.getCurrent({ populate: true }).catch(err => {
@@ -341,9 +354,10 @@ async function coreOperations({ forceAll = false } = {}) {
     if (!activeTab) return;
 
     const site = validateWebsite(activeTab.url, websitesCache || []);
-    console.log('core operations go', tabEngaged[activeTab.id]);
 
     const isEngagedOrPeek = tabEngaged[activeTab.id] || activePeeks[activeTab.id];
+
+    if (debugLogs) console.log('core operations run', (site && isEngagedOrPeek));
 
     if (forceAll || site && isEngagedOrPeek) {
       const timeLeft = calculateTimeLeft(site);
@@ -357,12 +371,16 @@ async function coreOperations({ forceAll = false } = {}) {
       await trackUsage(activeTab.id, site);
     }
 
-  } catch (err) { console.error('core operations failed: ', err); }
+  } catch (err) { 
+    if (debugLogs) console.error('core operations failed: ', err); 
+  } finally {
+    coreOpsRunning = false;
+  }
 };
 
 async function writeUpdates() {
   if (websiteChangesMade) {
-    console.log('Writing Updates!')
+    if (debugLogs) console.log('!!!!!        Writing Updates');
     await new Promise(resolve =>
       chrome.storage.local.set({ websites: websitesCache }, resolve)
     );
@@ -421,15 +439,21 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => { // updates betwe
 
 // Clean up state when a tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
-  delete peekStartTimes[tabId];
   delete tabEngaged[tabId];
   delete activeTabTimes[tabId];
+  delete blockedUrl[tabId];
+  delete activePeeks[tabId];
+  delete timerPorts[tabId];
+  delete timerStrings[tabId];
+  delete prevTimerStrings[tabId];
+  delete prevTimerDisabled[tabId];
+  delete prevBadgeState[tabId];
 });
 
 // send disabled status to popup and listen for visiblity messages
 chrome.runtime.onMessage.addListener(async (msg, sender) => {
   if (msg.type === "tabEngaged") {
-    console.log('Report Engaged State', msg.engaged);
+    if (debugLogs) console.log('Engaged State', msg.engaged);
     tabEngaged[sender.tab.id] = !!msg.engaged;
     activeTabTimes[sender.tab.id] = Date.now(); // reset last active time
   }
@@ -486,7 +510,7 @@ chrome.runtime.onConnect.addListener((port) => {
       // Get status right when the popup connects
       const status = await checkIfDisabled();
       try { port.postMessage({ type: "updateStatusInPopup", disabledStatus: status }); }
-      catch (err) { console.error(err) }
+      catch (err) { }
     })();
   }
   if (port.name === "timer" && port.sender?.tab?.id != null) {
@@ -512,11 +536,13 @@ chrome.runtime.onConnect.addListener((port) => {
     port.onDisconnect.addListener(() => {
       try {
         if (chrome.runtime.lastError) {
-          console.warn("Port disconnect error:", err.message);
+          if (debugLogs) console.warn("Port disconnect error:", chrome.runtime.lastError.message);
         }
       } catch (err) {}
       delete timerPorts[tabId];
       delete timerStrings[tabId];
+      delete prevTimerStrings[tabId];
+      delete prevTimerDisabled[tabId];
     });
   }
 });
