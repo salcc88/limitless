@@ -153,38 +153,28 @@ function updateBigTimerStrings(activeTabId = null, domainString = "", timeString
     timerStrings[activeTabId] = { domainString, timeString };
   }
 
-  Object.entries(timerPorts).forEach(([tabId, port]) => {
-    if (!port) return;
+  const port = timerPorts[activeTabId];
+  if (!port) return;
 
-    const { domainString: domain = "", timeString: time = "0m" } = timerStrings[tabId] || {};
+  if (debugLogs) console.log('big timer strings', domainString, timeString);
 
-    const timerMessage = {
-      type: "timerUpdate",
-      domainString: activeTabId === Number(tabId) ? domainString : domain,
-      timeString: activeTabId === Number(tabId) ? timeString : time,
-      isTimerDisabled,
-      showTimer
+  const prev = prevTimerStrings[activeTabId] || {};
+  if (force || prev.domainString !== domainString || prev.timeString !== timeString) {
+    try { 
+      port.postMessage({
+        type: "timerUpdate",
+        domainString,
+        timeString,
+        isTimerDisabled,
+        showTimer
+      }); 
+      prevTimerStrings[activeTabId] = { domainString, timeString };
+    } catch {
+      delete timerPorts[activeTabId];
+      delete timerStrings[activeTabId];
+      delete prevTimerStrings[activeTabId];
     }
-
-    if (debugLogs) console.log('big timer strings', timerMessage.domainString, timerMessage.timeString);
-
-    const prev = prevTimerStrings[tabId];
-    if (
-      force ||
-      !prev ||
-      prev.domainString !== timerMessage.domainString ||
-      prev.timeString !== timerMessage.timeString
-    ) {
-      try { 
-        port.postMessage(timerMessage) 
-        prevTimerStrings[tabId] = timerMessage;
-      } catch {
-        delete timerPorts[tabId];
-        delete timerStrings[tabId];
-        delete prevTimerStrings[tabId];
-      }
-    }
-  });
+  }
 }
 function updateBigTimerDisable() { // update visiblity vars
   Object.entries(timerPorts).forEach(([tabId, port]) => {
@@ -200,6 +190,8 @@ function updateBigTimerDisable() { // update visiblity vars
       isTimerDisabled,
       showTimer
     }
+
+  if (debugLogs) console.log('big timer disabled?', timerMessage.isTimerDisabled || !timerMessage.showTimer);
 
     const prev = prevTimerDisabled[tabId];
     if (
@@ -330,18 +322,14 @@ async function coreOperations({ forceAll = false } = {}) {
   coreOpsRunning = true;
   
   try {
-    if (await checkIfDisabled()) {
-      return;
-    }
+    if (await checkIfDisabled()) return;
 
     if (!forceAll) { // exit if no engaged tabs or active peeks and not forced
       const activeTabId = Object.keys(tabEngaged).find(id => {
         const numId = Number(id);
         return tabEngaged[numId] || activePeeks[numId];
       });
-      if (!activeTabId) {
-        return;
-      }
+      if (!activeTabId) return;
     }
 
     const windowInfo = await chrome.windows.getCurrent({ populate: true }).catch(err => {
