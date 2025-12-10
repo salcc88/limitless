@@ -168,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   function renderSites() {
-    if (!websites || websites.length === 0) {
+    if (!websites || websites.length === 0) { // If no websites
       siteList.innerHTML = "";
       const li = document.createElement("li");
       li.classList.add("subtext", "no-limits-set");
@@ -177,78 +177,60 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     } 
 
-    const existingItems = siteList.querySelectorAll("li:not(.no-limits-set)");
-    if (existingItems.length !== websites.length) {
-      siteList.innerHTML = "";
-      const fragment = document.createDocumentFragment();
+    siteList.innerHTML = "";
+    const fragment = document.createDocumentFragment();
 
-      websites.forEach((site, index) => {
-        const li = document.createElement("li");
-        li.dataset.index = String(index);
+    websites.forEach((site) => {
+      const li = document.createElement("li");
+      li.dataset.domain = site.domain;
 
-        const domainSpan = document.createElement("span"); // website name
-        domainSpan.textContent = site.domain;
-        domainSpan.classList.add("site-name", "base-text");
+      const domainSpan = document.createElement("span"); // website name
+      domainSpan.textContent = site.domain;
+      domainSpan.classList.add("site-name", "base-text");
 
-        const timeSelect = document.createElement("select"); // time limit
-        timeSelect.id = "time-select" + index;
-        timeSelect.setAttribute("aria-label", "Daily Time Limit");
-        timeSelect.classList.add("base-text");
-        timeSelect.dataset.type = "timeSelect";
-        timeSelect.appendChild(limitTimesFragment.cloneNode(true));
-        timeSelect.value = String(site.timeLimit || 0);
-       
-        // Construct peekmode toggle switch checkbox
-        const toggleWrapper = document.createElement("label");
-        toggleWrapper.classList.add("toggle-switch");
+      const timeSelect = document.createElement("select"); // time limit
+      timeSelect.name = "time-limit";
+      timeSelect.setAttribute("aria-label", "Daily Time Limit");
+      timeSelect.classList.add("base-text");
+      timeSelect.dataset.type = "timeSelect";
+      timeSelect.dataset.domain = site.domain;
+      timeSelect.appendChild(limitTimesFragment.cloneNode(true));
+      timeSelect.value = String(site.timeLimit || 0);
+     
+      // Construct peekmode toggle switch checkbox
+      const toggleWrapper = document.createElement("label");
+      toggleWrapper.classList.add("toggle-switch");
 
-        const peekCheckbox = document.createElement("input");
-        peekCheckbox.type = "checkbox";
-        peekCheckbox.setAttribute("aria-label", "Toggle Peek Mode");
-        peekCheckbox.id = "peek-check" + index;
-        peekCheckbox.checked = !!site.peekMode;
-        peekCheckbox.dataset.type = "peekCheckbox";
+      const peekCheckbox = document.createElement("input");
+      peekCheckbox.type = "checkbox";
+      peekCheckbox.setAttribute("aria-label", "Toggle Peek Mode");
+      peekCheckbox.name = "peek-mode";
+      peekCheckbox.checked = !!site.peekMode;
+      peekCheckbox.dataset.type = "peekCheckbox";
+      peekCheckbox.dataset.domain = site.domain;
 
-        const sliderSpan = document.createElement("span");
-        sliderSpan.classList.add("switch-slider");
+      const sliderSpan = document.createElement("span");
+      sliderSpan.classList.add("switch-slider");
+      toggleWrapper.append(peekCheckbox, sliderSpan);
+      // delete button
+      const deleteBtn = document.createElement("button");
+      deleteBtn.textContent = "Delete";
+      deleteBtn.classList.add("delete");
+      deleteBtn.dataset.domain = site.domain;
+      // time left display
+      const timeLeftSpan = document.createElement("span"); 
+      timeLeftSpan.classList.add("time-left", "subtext");
+      timeLeftSpan.dataset.type = "timeLeft";
+      timeLeftSpan.dataset.domain = site.domain;
+      const usage = Number(site.usage || 0);
+      const timeLimit = Number(site.timeLimit || 0);
+      const remaining = Math.ceil(Math.max(timeLimit - usage, 0));
+      timeLeftSpan.textContent = `${remaining} min`;
 
-        toggleWrapper.append(peekCheckbox, sliderSpan);
-
-        // delete button
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Delete";
-        deleteBtn.classList.add("delete");
-
-        // time left display
-        const timeLeftSpan = document.createElement("span"); 
-        timeLeftSpan.classList.add("time-left", "subtext");
-        timeLeftSpan.dataset.type = "timeLeft";
-        const usage = Number(site.usage || 0);
-        const timeLimit = Number(site.timeLimit || 0);
-        const remaining = Math.ceil(Math.max(timeLimit - usage, 0));
-        timeLeftSpan.textContent = `${remaining} min`;
-
-        li.append(domainSpan, timeSelect, toggleWrapper, timeLeftSpan, deleteBtn);
-        fragment.appendChild(li);
-      });
-      siteList.appendChild(fragment);
-    } else { // only change toggle and selects if sitelist doesnt change
-      existingItems.forEach((item, index) => {
-        const site = websites[index];
-        if (!site) return;
-        const timeSelect = item.querySelector('select[data-type="timeSelect"]');
-        const peekCheckbox = item.querySelector('input[data-type="peekCheckbox"]');
-        const timeLeftSpan = item.querySelector('span[data-type="timeLeft"]');
-
-        if (timeSelect) timeSelect.value = String(site.timeLimit || 0);
-        if (peekCheckbox) peekCheckbox.checked = !!site.peekMode;
-        if (timeLeftSpan) {
-          const usage = Number(site.usage || 0);
-          const timeLimit = Number(site.timeLimit || 0);
-          timeLeftSpan.textContent = `${Math.ceil(Math.max(timeLimit - usage, 0))} min`;
-        }
-      });
-    }
+      li.append(domainSpan, timeSelect, toggleWrapper, timeLeftSpan, deleteBtn);
+      fragment.appendChild(li);
+    });
+    siteList.appendChild(fragment);
   }
 
   // settings change listeners
@@ -296,27 +278,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // change events inside siteList - limit time and peekmode toggle
     const li = e.target.closest("li");
-    if (li) {
-      const index = Number(li.dataset.index);
-      const site = websites[index];
-      if (!site) return;
-      if (e.target.matches('select') && e.target.dataset.type === "timeSelect") {
-        site.timeLimit = Number(e.target.value);
-        saveConfiguration("websites", websites)
-        const timeSpan = li.querySelector('[data-type="timeLeft"]');
-        if (timeSpan) {
-          const usage = Number(site.usage || 0);
-          const remaining = Math.ceil(Math.max(site.timeLimit - usage, 0));
-          timeSpan.textContent = `${remaining} min`;
-        }
-        return;
+    if (!li) return;
+    const domain = li.dataset.domain;
+    const site = websites.find(s => s.domain === domain);
+    if (!site) return;
+
+    if (e.target.matches('select[data-type="timeSelect"]')) {
+      site.timeLimit = Number(e.target.value);
+      saveConfiguration("websites", websites);
+
+      const timeSpan = li.querySelector('[data-type="timeLeft"]');
+      if (timeSpan) {
+        const usage = Number(site.usage || 0);
+        const remaining = Math.ceil(Math.max(site.timeLimit - usage, 0));
+        timeSpan.textContent = `${remaining} min`;
       }
-      
-      if (e.target.matches('input[type="checkbox"]') && e.target.dataset.type === "peekCheckbox") {
-        site.peekMode = !!e.target.checked;
-        saveConfiguration("websites", websites)
-        return
-      }
+      return;
+    }
+    
+    if (e.target.matches('input[data-type="peekCheckbox"]')) {
+      site.peekMode = !!e.target.checked;
+      saveConfiguration("websites", websites);
+      return;
     }
   });
 
@@ -334,7 +317,7 @@ document.addEventListener("DOMContentLoaded", () => {
   addNewButton.addEventListener("click", () => {
     const rawInput = newDomainInput.value.toLowerCase().trim(); // remove whitespace
     if (!rawInput) return;
-    const cleanedInput = rawInput.replace(/^https?:\/\/(www\.)?|^www\./, "").replace(/\/$/, "");  // remove www. and trailing slash
+    const cleanedInput = rawInput.toLowerCase().replace(/^https?:\/\/(www\.)?|^www\./, "").replace(/\/$/, "");  // remove http(s)://www. and trailing slash
     if (websites.find(site => site.domain === cleanedInput)) {
       alert("You already have a limit for this website.");
       return;
@@ -350,18 +333,19 @@ document.addEventListener("DOMContentLoaded", () => {
     newDomainInput.value = "";
     addNewButton.disabled = true;
   });
+
   // delete website
   siteList.addEventListener("click", (e) => {
     if (!e.target.matches('button.delete')) return;
     const li = e.target.closest("li");
     if (!li) return;
-    const index = Number(li.dataset.index);
-    const site = websites[index];
+    const domain = li.dataset.domain;
+    const site = websites.find(s => s.domain === domain);
     if (!site) return;
     const confirmed = confirm(`Are you sure you want to remove the limit for ${site.domain}?`);
     if (!confirmed) return;
       
-    websites.splice(index, 1);
+    websites = websites.filter(s => s.domain !== domain);
     saveConfiguration("websites", websites);
     renderSites();
   });
