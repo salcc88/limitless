@@ -286,19 +286,19 @@ async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
       }
       timeString = text;
     }
-
-    const prevTimer = prevTimerStrings[tabId];
-    if (
-      (force || !prevTimer || prevTimer.timeString !== timeString)
-      && (showTimer === true && isTimerDisabled === false)
-    ) {
-      updateBigTimerStrings(tabId, site.domain, timeString, { force });
-    }
-
   } else { // !site or forced
     text = "";
     timeString = "0m";
     color = blueColor;
+  }
+
+  const prevTimer = prevTimerStrings[tabId];
+  if (
+    (force || !prevTimer || prevTimer.timeString !== timeString)
+    && (showTimer === true && isTimerDisabled === false)
+  ) {
+    let timerDomainString = site?.domain || "";
+    updateBigTimerStrings(tabId, timerDomainString, timeString, { force });
   }
     
   const prev = prevBadgeState[tabId] || {};
@@ -360,7 +360,7 @@ async function coreOperations({ forceAll = false } = {}) {
 
     const isEngagedOrPeek = tabEngaged[activeTab.id] || activePeeks[activeTab.id];
 
-    if (debugLogs) console.log('%ccore operations run', 'color: orange',(site && isEngagedOrPeek));
+    if (debugLogs) console.log('%ccore operations run', 'color: orange', (site && isEngagedOrPeek));
 
     if (forceAll || site && isEngagedOrPeek) {
       const timeLeft = calculateTimeLeft(site);
