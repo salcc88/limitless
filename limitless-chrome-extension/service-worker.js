@@ -4,6 +4,25 @@
 
 const debugLogs = true;
 
+// --------------
+//self.debugSetUsage = function({domain, usage}) {
+//  if (!domain || !usage) {
+//    console.warn("format: debugSetUsage({ domain: \"website.com\", usage: 60 })");
+//    return;
+//  }
+//
+//  const site = websitesCache.find(s => s.domain === domain);
+//  if (!site) {
+//    console.warn(`debugSetUsage: no site found for domain "${domain}"`);
+//    return;
+//  }
+//
+//  site.usage = usage;
+//  websiteChangesMade = true;
+//  console.log(`debugSetUsage: Set usage for ${domain} to ${usage} minutes`);
+//}
+// ----------------
+
 // In-memory maps, using tabs as keys
 const activeTabTimes = {}; // last timestamp per active tab
 const tabEngaged = {}; // engaged state per tabId (active tab + window focus + not minimzed)
@@ -23,11 +42,11 @@ const prevBadgeState = {};
 const timerPorts = {};
 const timerStrings = {};
 const prevTimerStrings = {};
+const prevTimerDisabled = {isTimerDisabled: false, showTimer: true};
 let isTimerDisabled = false;
 let showTimer = true;
-const prevTimerDisabled = {}
 
-const blueColor = "#75f8e0"; // Extra bright blue
+const blueColor = '#43dabe'; // blue-highlight 
 const orangeColor = "#FFC66B";
 const redColor = "#FF6B6B";
 const grayColor = "#1D1D1D";
@@ -148,72 +167,65 @@ function sendTimeLeftNotification(domain, minutesLeft) {
 }
 
 // floating timer messaging
-function updateBigTimerStrings(activeTabId = null, domainString = "", timeString = "0m", { force = false } = {}) {
-  if (activeTabId) {
-    timerStrings[activeTabId] = { domainString, timeString };
-  }
+function updateBigTimerStrings(activeTabId, domainString = "", timeString = "0m", { force = false } = {}) {
+  if (!activeTabId) return;
+  const prev = prevTimerStrings[activeTabId] || {};
+  const needsUpdate = prev.domainString !== domainString || prev.timeString !== timeString;
+  if (!needsUpdate && !force) return;
+
+  timerStrings[activeTabId] = { domainString, timeString };
 
   const port = timerPorts[activeTabId];
-  if (!port) return;
+  if (!port || port.disconnected) return;
 
-  if (debugLogs) console.log('big timer strings', domainString, timeString);
+  if (debugLogs) console.log('%c--- big timer strings', 'color: yellow', domainString, timeString);
 
-  const prev = prevTimerStrings[activeTabId] || {};
-  if (force || prev.domainString !== domainString || prev.timeString !== timeString) {
-    try { 
+  try { 
+    port.postMessage({
+      type: "timerUpdate",
+      domainString,
+      timeString,
+      isTimerDisabled,
+      showTimer
+    }); 
+    prevTimerStrings[activeTabId] = { domainString, timeString };
+  } catch (err) {
+    if (debugLogs) console.warn(`Failed to send timerUpdate to tab ${activeTabId}:`, err.message);
+  }
+}
+function updateBigTimerDisable() { // update visiblity vars
+  const needsUpdate = prevTimerDisabled.isTimerDisabled !== isTimerDisabled || prevTimerDisabled.showTimer !== showTimer;
+  if (!needsUpdate) return;
+
+  Object.entries(timerPorts).forEach(([tabId, port]) => {
+    if (!port || port.disconnected) return;
+
+    const domainString = prevTimerStrings[tabId]?.domainString ?? "";
+    const timeString = prevTimerStrings[tabId]?.timeString ?? "0m";
+
+    if (debugLogs) console.log('%c--- big timer disabled', 'color: lime', isTimerDisabled, !showTimer);
+
+    try {
       port.postMessage({
         type: "timerUpdate",
         domainString,
         timeString,
         isTimerDisabled,
         showTimer
-      }); 
-      prevTimerStrings[activeTabId] = { domainString, timeString };
-    } catch {
-      delete timerPorts[activeTabId];
-      delete timerStrings[activeTabId];
-      delete prevTimerStrings[activeTabId];
-    }
-  }
-}
-function updateBigTimerDisable() { // update visiblity vars
-  Object.entries(timerPorts).forEach(([tabId, port]) => {
-    if (!port) return;
-
-    const domainString = prevTimerStrings[tabId]?.domainString ?? "";
-    const timeString = prevTimerStrings[tabId]?.timeString ?? "0m";
-
-    const timerMessage = {
-      type: "timerUpdate",
-      domainString,
-      timeString,
-      isTimerDisabled,
-      showTimer
-    }
-
-  if (debugLogs) console.log('big timer disabled?', timerMessage.isTimerDisabled || !timerMessage.showTimer);
-
-    const prev = prevTimerDisabled[tabId];
-    if (
-      !prev || 
-      prev.isTimerDisabled !== isTimerDisabled || 
-      prev.showTimer !== showTimer
-    ) {
-      try {
-        port.postMessage(timerMessage);
-        prevTimerDisabled[tabId] = { isTimerDisabled, showTimer };
-      } catch {
-        delete timerPorts[tabId];
-        delete prevTimerDisabled[tabId];
-      }
+      });
+    } catch (err) {
+      if (debugLogs) console.warn(`Failed to send disabled timerUpdate to tab ${activeTabId}:`, err.message);
     }
   });
+
+  prevTimerDisabled.isTimerDisabled = isTimerDisabled;
+  prevTimerDisabled.showTimer = showTimer;
 }
 
 // Track usage only for the tab if it's being engaged
 async function trackUsage(tabId, site) {
   try {
-    if (debugLogs) console.log('track usage', site?.domain, site?.usage);
+    if (debugLogs) console.log('%ctrack usage', 'color: purple', site?.domain, site?.usage);
     const now = Date.now();
     const lastTime = activeTabTimes[tabId] || now;
     const diffMinutes = (now - lastTime) / 1000 / 60;
@@ -228,7 +240,7 @@ async function trackUsage(tabId, site) {
 
 // Update badge for a site and send info to the timer
 async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
-  if (debugLogs) console.log('update badge', site?.domain, site?.usage);
+  if (debugLogs) console.log('%cupdate badge', 'color: purple', site?.domain, site?.usage);
   const timeLeftCeil = Math.ceil(timeLeft);
   let numberHours = Math.floor(timeLeftCeil / 60);
   let numberMinutes = timeLeftCeil % 60;
@@ -276,7 +288,10 @@ async function updateBadge(tabId, site, timeLeft, { force = false } = {}) {
     }
 
     const prevTimer = prevTimerStrings[tabId];
-    if (force || !prevTimer || prevTimer.timeString !== timeString) {
+    if (
+      (force || !prevTimer || prevTimer.timeString !== timeString)
+      && (showTimer === true && isTimerDisabled === false)
+    ) {
       updateBigTimerStrings(tabId, site.domain, timeString, { force });
     }
 
@@ -345,7 +360,7 @@ async function coreOperations({ forceAll = false } = {}) {
 
     const isEngagedOrPeek = tabEngaged[activeTab.id] || activePeeks[activeTab.id];
 
-    if (debugLogs) console.log('core operations run', (site && isEngagedOrPeek));
+    if (debugLogs) console.log('%ccore operations run', 'color: orange',(site && isEngagedOrPeek));
 
     if (forceAll || site && isEngagedOrPeek) {
       const timeLeft = calculateTimeLeft(site);
@@ -368,7 +383,7 @@ async function coreOperations({ forceAll = false } = {}) {
 
 async function writeUpdates() {
   if (websiteChangesMade) {
-    if (debugLogs) console.log('!!!!!        Writing Updates');
+    if (debugLogs) console.log('%c!!!!!!!!!!!!!!!! Writing Updates', 'color: red');
     await new Promise(resolve =>
       chrome.storage.local.set({ websites: websitesCache }, resolve)
     );
@@ -393,11 +408,17 @@ async function resetDailyUsage() {
 
   // reset notification log
   Object.keys(notificationsSent).forEach(key => { delete notificationsSent[key] });
+  Object.keys(prevBadgeState).forEach(key => delete prevBadgeState[key]);
+  Object.keys(timerStrings).forEach(key => delete timerStrings[key]);
+  Object.keys(prevTimerStrings).forEach(key => delete prevTimerStrings[key]);
+  Object.keys(activeTabTimes).forEach(key => delete activeTabTimes[key]);
 
   //reset badge and big timer:
   chrome.action.setBadgeText({ text: "" });
   chrome.action.setBadgeBackgroundColor({ color: blueColor });
-  updateBigTimerStrings(null, "", "0m", { force: true });
+  Object.keys(timerPorts).forEach(tabId => {
+    updateBigTimerStrings(tabId, "", "0m", { force: true });
+  });
 };
 
 // Schedule next midnight alarm
@@ -405,9 +426,9 @@ function scheduleMidnightReset() {
   const now = new Date();
   const nextMidnight = new Date();
   nextMidnight.setHours(24,0,0,0); // next calendar day midnight
-  const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+  const minutesToMidnight = nextMidnight.getTime() - now.getTime();
 
-  chrome.alarms.create("midnightReset", { when: Date.now() + msUntilMidnight });
+  chrome.alarms.create("midnightReset", { when: Date.now() + minutesToMidnight });
 }
 
 // Update when tab is activated or updated
@@ -434,7 +455,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   delete timerPorts[tabId];
   delete timerStrings[tabId];
   delete prevTimerStrings[tabId];
-  delete prevTimerDisabled[tabId];
   delete prevBadgeState[tabId];
 });
 
@@ -515,22 +535,16 @@ chrome.runtime.onConnect.addListener((port) => {
         isTimerDisabled,
         showTimer
       });
-    } catch {
-      delete timerPorts[tabId];
-      delete timerStrings[tabId];
+    } catch (err) {
+      if (debugLogs) console.warn("Failed to post initial timer state:", err);
     }
 
     // Clean up on disconnect
     port.onDisconnect.addListener(() => {
-      try {
-        if (chrome.runtime.lastError) {
-          if (debugLogs) console.warn("Port disconnect error:", chrome.runtime.lastError.message);
-        }
-      } catch (err) {}
+      if (chrome.runtime.lastError) {
+        if (debugLogs) console.warn("Port disconnect error:", chrome.runtime.lastError.message);
+      }
       delete timerPorts[tabId];
-      delete timerStrings[tabId];
-      delete prevTimerStrings[tabId];
-      delete prevTimerDisabled[tabId];
     });
   }
 });
@@ -540,6 +554,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === "midnightReset") {
     await resetDailyUsage();
     scheduleMidnightReset(); // schedule for the next midnight
+    await coreOperations();
     return;
   } else if (alarm.name === "updateAll") { await coreOperations() }
   if (alarm.name === "writeAll") { await writeUpdates() }
