@@ -534,7 +534,7 @@ footer {
     flex-direction: column;
     align-items: flex-start;
   }
-  .dash-content li {
+  #dashboard-wrap li {
     gap: 0.5rem;
   }
   .base-text {

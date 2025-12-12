@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Limitless - Smarter Website Limits",
   "short_name": "Limitless",
-  "description": "Stay focused and take control of your time. Create website limits, set a schedule, and use Peek Mode to effectively manage distractions.",
-  "version": "1.0",
+  "description": "Create website limits, set a schedule, and use Peek Mode to effectively manage distractions.",
+  "version": "1.0.0",
   "permissions": [
     "storage",
     "tabs",
