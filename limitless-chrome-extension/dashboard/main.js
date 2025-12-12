@@ -317,7 +317,11 @@ document.addEventListener("DOMContentLoaded", () => {
   addNewButton.addEventListener("click", () => {
     const rawInput = newDomainInput.value.toLowerCase().trim(); // remove whitespace
     if (!rawInput) return;
-    const cleanedInput = rawInput.toLowerCase().replace(/^https?:\/\/(www\.)?|^www\./, "").replace(/\/$/, "");  // remove http(s)://www. and trailing slash
+    let cleanedInput = rawInput.toLowerCase().replace(/^https?:\/\/(www\.)?|^www\./, "").replace(/\/$/, "");  // remove http(s)://www. and trailing slash
+    const includesExtension = cleanedInput.includes('.');
+    if (!includesExtension) {
+      cleanedInput = cleanedInput + ".com";
+    }
     if (websites.find(site => site.domain === cleanedInput)) {
       alert("You already have a limit for this website.");
       return;
