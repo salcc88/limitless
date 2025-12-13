@@ -1,5 +1,5 @@
 // content-scripts/timer.js
-let timerBox = null;
+let timerWrapper = null;
 let timerNumber = null;
 let domainSpan = null;
 
@@ -7,6 +7,8 @@ let timeString = "0m";
 let domainString = "";
 let isTimerDisabled = false;
 let showTimer = true;
+
+const fontUrl = chrome.runtime.getURL("assets/font/plus-jakarta-sans-500.woff2");
 
 const flashingTimes = new Set(["5m","4m","3m","2m","1m"]);
 
@@ -27,8 +29,124 @@ document.addEventListener("mouseup", () => {
   }
 });
 
-function createTimerBox() {
-  if (timerBox) return;
+function createTimer() {
+  if (timerWrapper) return;
+
+  timerWrapper = document.createElement("div");
+  timerWrapper.id = "limitless-timer-wrapper";
+  timerWrapper.style.position = "fixed";
+  timerWrapper.style.top = "20px";
+  timerWrapper.style.left = "20px";
+  timerWrapper.style.zIndex = "999999";
+  timerWrapper.style.cursor = "grab";
+  const shadow = timerWrapper.attachShadow({ mode: "closed" });
+
+  const timerStyle = document.createElement("style");
+  timerStyle.textContent = `
+    @font-face {
+      font-family: "Plus Jakarta Sans";
+      src: url("${fontUrl}") format("woff2");
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    #limitless-timer-box {
+      color-scheme: light dark;
+
+      --text: #1D1D1D;
+      --gray: #939393;
+      --blue: #3BC4AB;
+      --bg: #FFFFFF;
+      --bg-rgb: 255,255,255;
+      --base-shadow: 0 2px 12px rgba(0,0,0,0.3);
+
+      font-family: "Plus Jakarta Sans", sans-serif !important;
+
+      min-width: 130px;
+      box-sizing: border-box !important;
+      overflow: hidden;
+      padding: 24px 0px 16px 0px;
+      background-color: rgba(var(--bg-rgb), 0.95);
+      border: 3px solid var(--blue);
+      border-radius: 8px;
+      pointer-events: auto;
+      box-shadow: var(--base-shadow);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      user-select: none;
+    }
+    #limitless-timer-box:active {
+      cursor: grabbing;
+    }
+    #limitless-timer-box > #limitless-domain-span,
+    #limitless-timer-box > #limitless-timer-span { 
+      font-family: 'Plus Jakarta Sans', sans-serif !important;
+      font-weight: 500 !important;
+      color: var(--gray) !important;
+      font-size: 14px !important;
+      line-height: 20px !important;
+      padding: 0 4px !important;
+      text-align: center;
+    }
+    #limitless-timer-box > #limitless-timer-number { 
+      font-size: 32px !important;
+      line-height: 32px !important;
+      margin: 0 !important;
+      font-family: 'Plus Jakarta Sans', sans-serif !important;
+      font-weight: 500 !important;
+      color: var(--blue) !important;
+     }
+     #limitless-timer-box > #limitless-timer-number.flashing {
+      animation: flashing 2000ms ease-out infinite;
+     }
+
+    #limitless-timer-box > #limitless-close-button {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      box-shadow: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      flex: 0;
+      border-radius: 0;
+      transition: opacity 150ms;
+    }
+    #limitless-timer-box > #limitless-close-button:hover {
+      opacity: 0.5;
+    }
+    #limitless-timer-box > #limitless-close-button svg line {
+      stroke: var(--gray);
+      stroke-width: 2px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      #limitless-timer-box {
+        --text: #FFFFFF;
+        --gray: #a4b7b4;
+        --blue: #43DABE; /* blue-highlight */
+        --bg: #1d1d1d;
+        --bg-rgb: 29,29,29;
+
+        --base-shadow: 0 2px 12px rgba(0,0,0,0.7);
+      }
+    }
+
+    @keyframes flashing {
+      0%, 50% { opacity: 1; }
+      25% { opacity: 0.3; }
+    }
+
+  `
+  shadow.appendChild(timerStyle);
 
   timerBox = document.createElement("div");
   timerBox.id = "limitless-timer-box";
@@ -60,20 +178,22 @@ function createTimerBox() {
   `;
   closeBtn.addEventListener("click", () => {
     showTimer = false;
-    cleanupTimerBox();
+    cleanupTimer();
     chrome.storage.local.set({ showTimer: false });
     chrome.runtime.sendMessage({ type: "disableShowTimer" });
   });
   timerBox.appendChild(closeBtn);
 
-  document.body.appendChild(timerBox);
+  shadow.appendChild(timerBox);
 
-  makeDraggable(timerBox);
+  document.body.appendChild(timerWrapper);
+
+  makeDraggable(timerWrapper);
 }
 
 function makeDraggable(el) {
   el.addEventListener("mousedown", (e) => {
-    if (e.target.closest("#limitless-close-button")) return;
+    if (e.composedPath().some(el => el?.id === "limitless-close-button")) return;
     const rect = el.getBoundingClientRect();
     dragState.isDragging = true;
     dragState.el = el;
@@ -86,11 +206,11 @@ function makeDraggable(el) {
 
 function renderTimer() {
   if (isTimerDisabled || !showTimer || timeString === "0m") {
-    cleanupTimerBox();
+    cleanupTimer();
     return;
   }
 
-  if (!timerBox) createTimerBox();
+  if (!timerWrapper) createTimer();
 
   if (timerNumber.textContent !== timeString) {
     timerNumber.textContent = timeString;
@@ -117,20 +237,20 @@ port.onMessage.addListener((msg) => {
   }
 });
 
-function cleanupTimerBox() {
-  if (!timerBox) return;
-  timerBox.remove();
-  timerBox = null;
+function cleanupTimer() {
+  if (!timerWrapper) return;
+  timerWrapper.remove();
+  timerWrapper = null;
   timerNumber = null;
   domainSpan = null;
 }
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
-    cleanupTimerBox();
+    cleanupTimer();
   }
 });
 
 // Pagehide fires on unload and bfcache
-window.addEventListener("pagehide", cleanupTimerBox);
+window.addEventListener("pagehide", cleanupTimer);
 
