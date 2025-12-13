@@ -433,7 +433,7 @@ function scheduleMidnightReset() {
 
 // Update when tab is activated or updated
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => { // calls on reload, url change
-  if (changeInfo.status === "loading") { // might not have valid url when loadng TODO
+  if (changeInfo.url) {
     await coreOperations({ forceAll: true });
   }
 });

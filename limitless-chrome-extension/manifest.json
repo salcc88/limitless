@@ -33,7 +33,7 @@
         "content-scripts/check-engagement.js", 
         "content-scripts/timer.js"
       ],
-      "run_at": "document_start"
+      "run_at": "document_end"
     }
   ],
   "icons": {

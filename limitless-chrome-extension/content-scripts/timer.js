@@ -141,8 +141,8 @@ function createTimer() {
     }
 
     @keyframes flashing {
-      0%, 50% { opacity: 1; }
-      25% { opacity: 0.3; }
+      0%, 25% { opacity: 1; }
+      12% { opacity: 0.3; }
     }
 
   `
@@ -232,8 +232,7 @@ port.onMessage.addListener((msg) => {
     timeString = msg.timeString;
     isTimerDisabled = msg.isTimerDisabled;
     showTimer = msg.showTimer;
-    if (document.body) renderTimer();
-    else document.addEventListener("DOMContentLoaded", renderTimer, { once: true });
+    renderTimer();
   }
 });
 
