@@ -11,9 +11,6 @@
     "alarms",
     "notifications"
   ],
-  "host_permissions": [
-    "<all_urls>"
-  ],
   "action": {
     "default_popup": "popup/index.html",
     "default_icon": { "48": "assets/icons/icon48.png" },
