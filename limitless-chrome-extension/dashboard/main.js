@@ -180,7 +180,9 @@ document.addEventListener("DOMContentLoaded", () => {
     siteList.innerHTML = "";
     const fragment = document.createDocumentFragment();
 
-    websites.forEach((site) => {
+    const sortedWebsites = [...websites].sort((a, b) => a.domain.localeCompare(b.domain));
+
+    sortedWebsites.forEach((site) => {
       const li = document.createElement("li");
       li.dataset.domain = site.domain;
 
