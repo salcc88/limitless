@@ -1,5 +1,5 @@
 // Limitless Extension
-// Copyright 2025 Sal Costa
+// Copyright 2026 Sal Costa
 // https://salcosta.dev
 
 const debugLogs = false;
@@ -31,6 +31,7 @@ const blockedUrl = {}; // tab url that gets blocked
 const activePeeks = {}; // tabs actively in peek mode
 
 let websitesCache = [];
+let websitesCacheInitialized = false;
 let websiteChangesMade = false;
 
 let coreOpsRunning = false; 
@@ -51,8 +52,23 @@ const orangeColor = "#FFC66B";
 const redColor = "#FF6B6B";
 const grayColor = "#1D1D1D";
 
+if (debugLogs) {
+  console.log("SW wake:", Date.now());
+  self.addEventListener("activate", () => console.log("SW activated"));
+}
+
 async function getStorage(keys) {
   return new Promise((resolve) => { chrome.storage.local.get(keys, resolve) });
+}
+
+// check if website cache is initialized
+async function ensureWebsitesCache() {
+  if (!websitesCacheInitialized) {
+    const data = await getStorage(["websites"]);
+    websitesCache = data.websites || [];
+    websitesCacheInitialized = true;
+    if (debugLogs) console.log('websitesCache has been (re)initialized');
+  }
 }
 function timeStringToMinutes(str) {
   const [h, m] = str.split(":").map(Number);
@@ -337,6 +353,7 @@ async function coreOperations({ forceAll = false } = {}) {
   coreOpsRunning = true;
   
   try {
+    await ensureWebsitesCache();
     if (await checkIfDisabled()) return;
 
     if (!forceAll) { // exit if no engaged tabs or active peeks and not forced
@@ -404,6 +421,7 @@ async function resetDailyUsage() {
 
   // reset cache and storage
   websitesCache = resetWebsites;
+  websitesCacheInitialized = true;
   await new Promise((resolve) => chrome.storage.local.set({ websites: resetWebsites, lastReset: today }, resolve));
 
   // reset notification log
@@ -460,6 +478,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // send disabled status to popup and listen for visiblity messages
 chrome.runtime.onMessage.addListener(async (msg, sender) => {
+  await ensureWebsitesCache();
+  
   if (msg.type === "tabEngaged") {
     if (debugLogs) console.log('Engaged State', msg.engaged);
     tabEngaged[sender.tab.id] = !!msg.engaged;
@@ -483,10 +503,15 @@ chrome.runtime.onMessage.addListener(async (msg, sender) => {
         usage: existingSite?.usage ?? 0 // preserve usage if it exists
       };
     });
+    websitesCacheInitialized = true;
   }
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
+  const data = await getStorage(["websites"]);
+  websitesCache = data.websites || [];
+  websitesCacheInitialized = true;
+  
   chrome.alarms.create("updateAll", { periodInMinutes: 5 / 60 }); // every 5 seconds
   chrome.alarms.create("writeAll", { periodInMinutes: 15 / 60 }); // every 15 seconds
 
@@ -508,11 +533,14 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.runtime.onStartup.addListener( async () => {
   const data = await getStorage(["websites"]);
   websitesCache = data.websites || [];
+  websitesCacheInitialized = true;
   await resetDailyUsage(); // check for pending reset on browser startup
   scheduleMidnightReset(); 
 });
 
-chrome.runtime.onConnect.addListener((port) => {
+chrome.runtime.onConnect.addListener(async (port) => {
+  await ensureWebsitesCache();
+  
   if (port.name === "popup") {
     (async () => {
       // Get status right when the popup connects
@@ -551,6 +579,8 @@ chrome.runtime.onConnect.addListener((port) => {
 
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  await ensureWebsitesCache();
+  
   if (alarm.name === "midnightReset") {
     await resetDailyUsage();
     scheduleMidnightReset(); // schedule for the next midnight

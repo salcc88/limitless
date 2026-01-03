@@ -180,7 +180,14 @@ function createTimer() {
     showTimer = false;
     cleanupTimer();
     chrome.storage.local.set({ showTimer: false });
-    chrome.runtime.sendMessage({ type: "disableShowTimer" });
+    chrome.runtime.sendMessage({ type: "disableShowTimer" }, (response) => {
+      if (chrome.runtime.lastError) {
+        // retry if error
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ type: "disableShowTimer" });
+        }, 1000);
+      }
+    });
   });
   timerBox.appendChild(closeBtn);
 
@@ -224,17 +231,43 @@ function renderTimer() {
   }
 };
 
-const port = chrome.runtime.connect({ name: "timer" });
+let port = null;
 
-port.onMessage.addListener((msg) => {
-  if (msg.type === "timerUpdate") {
-    domainString = msg.domainString;
-    timeString = msg.timeString;
-    isTimerDisabled = msg.isTimerDisabled;
-    showTimer = msg.showTimer;
-    renderTimer();
+function connectPort() {
+  if (port) {
+    try {
+      port.disconnect();
+    } catch (err) {}
   }
-});
+  
+  port = chrome.runtime.connect({ name: "timer" });
+  
+  port.onMessage.addListener((msg) => {
+    if (msg.type === "timerUpdate") {
+      domainString = msg.domainString;
+      timeString = msg.timeString;
+      isTimerDisabled = msg.isTimerDisabled;
+      showTimer = msg.showTimer;
+      renderTimer();
+    }
+  });
+  
+  // try to reconnect if port is disconnected
+  port.onDisconnect.addListener(() => {
+    port = null;
+    if (chrome.runtime.lastError) {
+      if (document.visibilityState === "visible") {
+        setTimeout(() => {
+          if (document.visibilityState === "visible") {
+            connectPort();
+          }
+        }, 1000);
+      }
+    }
+  });
+}
+
+connectPort();
 
 function cleanupTimer() {
   if (!timerWrapper) return;
@@ -247,6 +280,9 @@ function cleanupTimer() {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     cleanupTimer();
+  } else if (document.visibilityState === "visible" && !port) {
+    // Reconnect if port was disconnected while tab was hidden
+    connectPort();
   }
 });
 

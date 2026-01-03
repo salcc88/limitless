@@ -375,5 +375,20 @@ document.addEventListener("DOMContentLoaded", () => {
       if (timerToggle) timerToggle.checked = false;
     }
   });
+
+  function refreshWebsitesData() {
+    chrome.storage.local.get(["websites"], (data) => {
+      websites = Array.isArray(data.websites) ? data.websites : [];
+      renderSites();
+    });
+  }
+
+  // refresh website times remaining when dashboard tab becomes active
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      refreshWebsitesData();
+    }
+  });
+
   loadAll();
 });

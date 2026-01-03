@@ -12,8 +12,24 @@ async function reportEngagedState() {
     chrome.runtime.sendMessage({
       type: "tabEngaged",
       engaged: isEngaged
+    }, (response) => {
+      // handle if sw is not running
+      if (chrome.runtime.lastError) {
+        // retry after 1s
+        setTimeout(() => {
+          if (document.visibilityState === "visible") {
+            reportEngagedState();
+          }
+        }, 1000);
+      }
     });
-  } catch (err) {}
+  } catch (err) {
+    setTimeout(() => {
+      if (document.visibilityState === "visible") {
+        reportEngagedState();
+      }
+    }, 1000);
+  }
 }
 
 // Listen for tab visibility changes (switching tabs, minimizing window)
