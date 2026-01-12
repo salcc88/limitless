@@ -52,9 +52,39 @@ const orangeColor = "#FFC66B";
 const redColor = "#FF6B6B";
 const grayColor = "#1D1D1D";
 
-if (debugLogs) {
-  console.log("SW wake:", Date.now());
-  self.addEventListener("activate", () => console.log("SW activated"));
+// Initialize on every service worker wake-up
+async function initializeOnWake() {
+  try {
+    // Run core operations to sync state and reinitialize if needed
+    await coreOperations({ forceAll: true });
+    
+    if (debugLogs) console.log("service worker initialized on wake");
+  } catch (err) {
+    if (debugLogs) console.error("error initializing on wake:", err);
+  }
+}
+
+// Run immediately on wake
+initializeOnWake();
+
+// Ensure alarms exist, unlikely that they wouldnt
+async function ensureAlarmsExist() {
+  try {
+    const alarms = await chrome.alarms.getAll();
+    const alarmNames = alarms.map(alarm => alarm.name);
+    
+    if (!alarmNames.includes("updateAll")) {
+      chrome.alarms.create("updateAll", { periodInMinutes: 5 / 60 });
+      if (debugLogs) console.log("Recreated updateAll alarm");
+    }
+    
+    if (!alarmNames.includes("writeAll")) {
+      chrome.alarms.create("writeAll", { periodInMinutes: 15 / 60 });
+      if (debugLogs) console.log("Recreated writeAll alarm");
+    }
+  } catch (err) {
+    if (debugLogs) console.error("Error ensuring alarms exist:", err);
+  }
 }
 
 async function getStorage(keys) {
@@ -590,6 +620,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 chrome.runtime.onStartup.addListener( async () => {
   try {
+    await ensureAlarmsExist();
     const data = await getStorage(["websites"]);
     websitesCache = data.websites || [];
     websitesCacheInitialized = true;
