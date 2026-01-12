@@ -2,7 +2,7 @@
 // Copyright 2026 Sal Costa
 // https://salcosta.dev
 
-const debugLogs = false;
+const debugLogs = true;
 
 // --------------
 //self.debugSetUsage = function({domain, usage}) {
@@ -58,7 +58,15 @@ if (debugLogs) {
 }
 
 async function getStorage(keys) {
-  return new Promise((resolve) => { chrome.storage.local.get(keys, resolve) });
+  return new Promise((resolve, reject) => { 
+    chrome.storage.local.get(keys, (result) => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+      } else {
+        resolve(result);
+      }
+    });
+  });
 }
 
 // check if website cache is initialized
@@ -401,42 +409,66 @@ async function coreOperations({ forceAll = false } = {}) {
 async function writeUpdates() {
   if (websiteChangesMade) {
     if (debugLogs) console.log('%c!!!!!!!!!!!!!!!! Writing Updates', 'color: red');
-    await new Promise(resolve =>
-      chrome.storage.local.set({ websites: websitesCache }, resolve)
-    );
-    websiteChangesMade = false;
+    try {
+      await new Promise((resolve, reject) => {
+        chrome.storage.local.set({ websites: websitesCache }, () => {
+          if (chrome.runtime.lastError) {
+            reject(chrome.runtime.lastError);
+          } else {
+            resolve();
+          }
+        });
+      });
+      websiteChangesMade = false;
+    } catch (err) {
+      if (debugLogs) console.error('writeUpdates failed:', err);
+      // Don't reset websiteChangesMade on error so it can retry
+    }
   }
 }
 
 async function resetDailyUsage() {
-  const today = new Date().toDateString();
-  const data = await getStorage(["websites", "lastReset"]);
-  if (data.lastReset === today) return; // not a new day yet
+  try {
+    const today = new Date().toDateString();
+    const data = await getStorage(["websites", "lastReset"]);
+    if (data.lastReset === today) return; // not a new day yet
 
-  const websites = data.websites || [];
-  const resetWebsites = websites.map(site => ({ 
-    ...site, 
-    usage: 0
-  }));
+    const websites = data.websites || [];
+    const resetWebsites = websites.map(site => ({ 
+      ...site, 
+      usage: 0
+    }));
 
-  // reset cache and storage
-  websitesCache = resetWebsites;
-  websitesCacheInitialized = true;
-  await new Promise((resolve) => chrome.storage.local.set({ websites: resetWebsites, lastReset: today }, resolve));
+    // reset cache and storage
+    websitesCache = resetWebsites;
+    websitesCacheInitialized = true;
+    await new Promise((resolve, reject) => {
+      chrome.storage.local.set({ websites: resetWebsites, lastReset: today }, () => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve();
+        }
+      });
+    });
 
-  // reset notification log
-  Object.keys(notificationsSent).forEach(key => { delete notificationsSent[key] });
-  Object.keys(prevBadgeState).forEach(key => delete prevBadgeState[key]);
-  Object.keys(timerStrings).forEach(key => delete timerStrings[key]);
-  Object.keys(prevTimerStrings).forEach(key => delete prevTimerStrings[key]);
-  Object.keys(activeTabTimes).forEach(key => delete activeTabTimes[key]);
+    // reset notification log
+    Object.keys(notificationsSent).forEach(key => { delete notificationsSent[key] });
+    Object.keys(prevBadgeState).forEach(key => delete prevBadgeState[key]);
+    Object.keys(timerStrings).forEach(key => delete timerStrings[key]);
+    Object.keys(prevTimerStrings).forEach(key => delete prevTimerStrings[key]);
+    Object.keys(activeTabTimes).forEach(key => delete activeTabTimes[key]);
 
-  //reset badge and big timer:
-  chrome.action.setBadgeText({ text: "" });
-  chrome.action.setBadgeBackgroundColor({ color: blueColor });
-  Object.keys(timerPorts).forEach(tabId => {
-    updateBigTimerStrings(tabId, "", "0m", { force: true });
-  });
+    //reset badge and big timer:
+    chrome.action.setBadgeText({ text: "" });
+    chrome.action.setBadgeBackgroundColor({ color: blueColor });
+    Object.keys(timerPorts).forEach(tabId => {
+      updateBigTimerStrings(tabId, "", "0m", { force: true });
+    });
+  } catch (err) {
+    if (debugLogs) console.error('resetDailyUsage failed:', err);
+    throw err; // Re-throw so caller can handle
+  }
 };
 
 // Schedule next midnight alarm
@@ -451,17 +483,29 @@ function scheduleMidnightReset() {
 
 // Update when tab is activated or updated
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => { // calls on reload, url change
-  if (changeInfo.url) {
-    await coreOperations({ forceAll: true });
+  try {
+    if (changeInfo.url) {
+      await coreOperations({ forceAll: true });
+    }
+  } catch (err) {
+    if (debugLogs) console.error('tabs.onUpdated error:', err);
   }
 });
 chrome.tabs.onActivated.addListener(async () => { // Force to keep timers displaying
-  await coreOperations({ forceAll: true });
-  await writeUpdates(); // fresh sync on tab switch
+  try {
+    await coreOperations({ forceAll: true });
+    await writeUpdates(); // fresh sync on tab switch
+  } catch (err) {
+    if (debugLogs) console.error('tabs.onActivated error:', err);
+  }
 });
 chrome.windows.onFocusChanged.addListener(async (windowId) => { // updates between multiple windows
-  if (windowId === chrome.windows.WINDOW_ID_NONE) return; // no window is focused
-  await coreOperations({ forceAll: true }); 
+  try {
+    if (windowId === chrome.windows.WINDOW_ID_NONE) return; // no window is focused
+    await coreOperations({ forceAll: true }); 
+  } catch (err) {
+    if (debugLogs) console.error('windows.onFocusChanged error:', err);
+  }
 });
 
 // Clean up state when a tab is closed
@@ -478,114 +522,141 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // send disabled status to popup and listen for visiblity messages
 chrome.runtime.onMessage.addListener(async (msg, sender) => {
-  await ensureWebsitesCache();
-  
-  if (msg.type === "tabEngaged") {
-    if (debugLogs) console.log('Engaged State', msg.engaged);
-    tabEngaged[sender.tab.id] = !!msg.engaged;
-    activeTabTimes[sender.tab.id] = Date.now(); // reset last active time
-  }
-  if (msg.type === "startPeek") {
-    const tabId = sender.tab?.id;
-    if (!tabId || !blockedUrl[tabId]) return;
-    startPeek(tabId, msg.duration);
-  }
-  if (msg.type === "disableShowTimer") {
-    showTimer = false;
-  }
-  if (msg.type === "dashWebsitesUpdated") {
-    const data = await getStorage(["websites"]);
-    const updatedWebsites = data.websites || [];
-    websitesCache = updatedWebsites.map(updatedSite => {
-      const existingSite = (websitesCache || []).find(site => site.domain === updatedSite.domain);
-      return {
-        ...updatedSite,
-        usage: existingSite?.usage ?? 0 // preserve usage if it exists
-      };
-    });
-    websitesCacheInitialized = true;
+  try {
+    await ensureWebsitesCache();
+    
+    if (msg.type === "tabEngaged") {
+      if (debugLogs) console.log('Engaged State', msg.engaged);
+      tabEngaged[sender.tab.id] = !!msg.engaged;
+      activeTabTimes[sender.tab.id] = Date.now(); // reset last active time
+    }
+    if (msg.type === "startPeek") {
+      const tabId = sender.tab?.id;
+      if (!tabId || !blockedUrl[tabId]) return;
+      startPeek(tabId, msg.duration);
+    }
+    if (msg.type === "disableShowTimer") {
+      showTimer = false;
+    }
+    if (msg.type === "dashWebsitesUpdated") {
+      const data = await getStorage(["websites"]);
+      const updatedWebsites = data.websites || [];
+      websitesCache = updatedWebsites.map(updatedSite => {
+        const existingSite = (websitesCache || []).find(site => site.domain === updatedSite.domain);
+        return {
+          ...updatedSite,
+          usage: existingSite?.usage ?? 0 // preserve usage if it exists
+        };
+      });
+      websitesCacheInitialized = true;
+    }
+  } catch (err) {
+    if (debugLogs) console.error('runtime.onMessage error:', err);
   }
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
-  const data = await getStorage(["websites"]);
-  websitesCache = data.websites || [];
-  websitesCacheInitialized = true;
-  
-  chrome.alarms.create("updateAll", { periodInMinutes: 5 / 60 }); // every 5 seconds
-  chrome.alarms.create("writeAll", { periodInMinutes: 15 / 60 }); // every 15 seconds
+  try {
+    const data = await getStorage(["websites"]);
+    websitesCache = data.websites || [];
+    websitesCacheInitialized = true;
+    
+    chrome.alarms.create("updateAll", { periodInMinutes: 5 / 60 }); // every 5 seconds
+    chrome.alarms.create("writeAll", { periodInMinutes: 15 / 60 }); // every 15 seconds
 
-  chrome.notifications.create(`limitless-install`, {
-    type: "basic",
-    iconUrl: "assets/icons/icon128.png",
-    title: "Thanks for using Limitless!",
-    silent: true,
-    requireInteraction: true,
-    message: `Be sure to pin the extension to the toolbar to see your live website timers.`,
-    priority: 2
-  });
+    chrome.notifications.create(`limitless-install`, {
+      type: "basic",
+      iconUrl: "assets/icons/icon128.png",
+      title: "Thanks for using Limitless!",
+      silent: true,
+      requireInteraction: true,
+      message: `Be sure to pin the extension to the toolbar to see your live website timers.`,
+      priority: 2
+    });
 
-  const today = new Date().toDateString(); // Initialize lastReset date
-  chrome.storage.local.set({ lastReset: today });
-  scheduleMidnightReset(); // schedule next reset
+    const today = new Date().toDateString(); // Initialize lastReset date
+    chrome.storage.local.set({ lastReset: today });
+    scheduleMidnightReset(); // schedule next reset
+  } catch (err) {
+    if (debugLogs) console.error('runtime.onInstalled error:', err);
+  }
 });
 
 chrome.runtime.onStartup.addListener( async () => {
-  const data = await getStorage(["websites"]);
-  websitesCache = data.websites || [];
-  websitesCacheInitialized = true;
-  await resetDailyUsage(); // check for pending reset on browser startup
-  scheduleMidnightReset(); 
+  try {
+    const data = await getStorage(["websites"]);
+    websitesCache = data.websites || [];
+    websitesCacheInitialized = true;
+    await resetDailyUsage(); // check for pending reset on browser startup
+    scheduleMidnightReset(); 
+  } catch (err) {
+    if (debugLogs) console.error('runtime.onStartup error:', err);
+  }
 });
 
 chrome.runtime.onConnect.addListener(async (port) => {
-  await ensureWebsitesCache();
-  
-  if (port.name === "popup") {
-    (async () => {
-      // Get status right when the popup connects
-      const status = await checkIfDisabled();
-      try { port.postMessage({ type: "updateStatusInPopup", disabledStatus: status }); }
-      catch (err) { }
-    })();
-  }
-  if (port.name === "timer" && port.sender?.tab?.id != null) {
-    const tabId = port.sender.tab.id;
-    timerPorts[tabId] = port;
-
-    // Send initial state for this tab
-    const { domainString = "", timeString = "0m" } = timerStrings[tabId] || {};
-    try {
-      port.postMessage({
-        type: "timerUpdate",
-        domainString,
-        timeString,
-        isTimerDisabled,
-        showTimer
-      });
-    } catch (err) {
-      if (debugLogs) console.warn("Failed to post initial timer state:", err);
+  try {
+    await ensureWebsitesCache();
+    
+    if (port.name === "popup") {
+      (async () => {
+        try {
+          // Get status right when the popup connects
+          const status = await checkIfDisabled();
+          try { port.postMessage({ type: "updateStatusInPopup", disabledStatus: status }); }
+          catch (err) { if (debugLogs) console.warn("Failed to send popup status:", err); }
+        } catch (err) {
+          if (debugLogs) console.error("Error checking disabled status for popup:", err);
+        }
+      })();
     }
+    if (port.name === "timer" && port.sender?.tab?.id != null) {
+      const tabId = port.sender.tab.id;
+      timerPorts[tabId] = port;
 
-    // Clean up on disconnect
-    port.onDisconnect.addListener(() => {
-      if (chrome.runtime.lastError) {
-        if (debugLogs) console.warn("Port disconnect error:", chrome.runtime.lastError.message);
+      // Send initial state for this tab
+      const { domainString = "", timeString = "0m" } = timerStrings[tabId] || {};
+      try {
+        port.postMessage({
+          type: "timerUpdate",
+          domainString,
+          timeString,
+          isTimerDisabled,
+          showTimer
+        });
+      } catch (err) {
+        if (debugLogs) console.warn("Failed to send initial timer state:", err);
       }
-      delete timerPorts[tabId];
-    });
+
+      // Clean up on disconnect
+      port.onDisconnect.addListener(() => {
+        if (chrome.runtime.lastError) {
+          if (debugLogs) console.warn("Port disconnect error:", chrome.runtime.lastError.message);
+        }
+        delete timerPorts[tabId];
+      });
+    }
+  } catch (err) {
+    if (debugLogs) console.error('runtime.onConnect error:', err);
   }
 });
 
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  await ensureWebsitesCache();
-  
-  if (alarm.name === "midnightReset") {
-    await resetDailyUsage();
-    scheduleMidnightReset(); // schedule for the next midnight
-    await coreOperations();
-    return;
-  } else if (alarm.name === "updateAll") { await coreOperations() }
-  if (alarm.name === "writeAll") { await writeUpdates() }
+  try {
+    await ensureWebsitesCache();
+    
+    if (alarm.name === "midnightReset") {
+      await resetDailyUsage();
+      scheduleMidnightReset(); // schedule for the next midnight
+      await coreOperations();
+      return;
+    } else if (alarm.name === "updateAll") { 
+      await coreOperations(); 
+    } else if (alarm.name === "writeAll") { 
+      await writeUpdates(); 
+    }
+  } catch (err) {
+    if (debugLogs) console.error('alarms.onAlarm error:', err);
+  }
 });
