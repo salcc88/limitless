@@ -238,7 +238,7 @@ function updateBigTimerDisable() { // update visiblity vars
         showTimer
       });
     } catch (err) {
-      if (debugLogs) console.warn(`Failed to send disabled timerUpdate to tab ${activeTabId}:`, err.message);
+      if (debugLogs) console.warn(`Failed to send disabled timerUpdate to tab ${tabId}:`, err.message);
     }
   });
 
@@ -467,7 +467,7 @@ async function resetDailyUsage() {
     });
   } catch (err) {
     if (debugLogs) console.error('resetDailyUsage failed:', err);
-    throw err; // Re-throw so caller can handle
+    throw err;
   }
 };
 
@@ -476,9 +476,9 @@ function scheduleMidnightReset() {
   const now = new Date();
   const nextMidnight = new Date();
   nextMidnight.setHours(24,0,0,0); // next calendar day midnight
-  const minutesToMidnight = nextMidnight.getTime() - now.getTime();
+  const msToMidnight = nextMidnight.getTime() - now.getTime();
 
-  chrome.alarms.create("midnightReset", { when: Date.now() + minutesToMidnight });
+  chrome.alarms.create("midnightReset", { when: Date.now() + msToMidnight });
 }
 
 // Update when tab is activated or updated
@@ -541,8 +541,14 @@ chrome.runtime.onMessage.addListener(async (msg, sender) => {
     if (msg.type === "dashWebsitesUpdated") {
       const data = await getStorage(["websites"]);
       const updatedWebsites = data.websites || [];
+      // Ensure cache is initialized before preserving usage
+      if (!websitesCacheInitialized) {
+        websitesCache = data.websites || [];
+        websitesCacheInitialized = true;
+        return;
+      }
       websitesCache = updatedWebsites.map(updatedSite => {
-        const existingSite = (websitesCache || []).find(site => site.domain === updatedSite.domain);
+        const existingSite = websitesCache.find(site => site.domain === updatedSite.domain);
         return {
           ...updatedSite,
           usage: existingSite?.usage ?? 0 // preserve usage if it exists
