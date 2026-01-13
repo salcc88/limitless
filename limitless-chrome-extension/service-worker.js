@@ -2,7 +2,7 @@
 // Copyright 2026 Sal Costa
 // https://salcosta.dev
 
-const debugLogs = true;
+const debugLogs = false;
 
 // --------------
 //self.debugSetUsage = function({domain, usage}) {
