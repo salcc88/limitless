@@ -600,15 +600,18 @@ chrome.runtime.onInstalled.addListener(async () => {
     chrome.alarms.create("updateAll", { periodInMinutes: 5 / 60 }); // every 5 seconds
     chrome.alarms.create("writeAll", { periodInMinutes: 15 / 60 }); // every 15 seconds
 
-    chrome.notifications.create(`limitless-install`, {
-      type: "basic",
-      iconUrl: "assets/icons/icon128.png",
-      title: "Thanks for using Limitless!",
-      silent: true,
-      requireInteraction: true,
-      message: `Be sure to pin the extension to the toolbar to see your live website timers.`,
-      priority: 2
-    });
+    // Only show the install notification if no user data
+    if (websitesCache.length === 0) {
+      chrome.notifications.create(`limitless-install`, {
+        type: "basic",
+        iconUrl: "assets/icons/icon128.png",
+        title: "Thanks for using Limitless!",
+        silent: true,
+        requireInteraction: true,
+        message: `Be sure to pin the extension to the toolbar to see your live website timers.`,
+        priority: 2
+      });
+    }
 
     const today = new Date().toDateString(); // Initialize lastReset date
     chrome.storage.local.set({ lastReset: today });
