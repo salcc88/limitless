@@ -217,7 +217,11 @@ function renderTimer() {
     return;
   }
 
-  if (!timerWrapper) createTimer();
+  // re-create the timer if it was removed from DOM (fixes YouTube bugs)
+  if (!timerWrapper || !timerWrapper.isConnected) {
+    cleanupTimer();
+    createTimer();
+  }
 
   if (timerNumber.textContent !== timeString) {
     timerNumber.textContent = timeString;
@@ -255,14 +259,12 @@ function connectPort() {
   // try to reconnect if port is disconnected
   port.onDisconnect.addListener(() => {
     port = null;
-    if (chrome.runtime.lastError) {
-      if (document.visibilityState === "visible") {
-        setTimeout(() => {
-          if (document.visibilityState === "visible") {
-            connectPort();
-          }
-        }, 1000);
-      }
+    if (document.visibilityState === "visible") {
+      setTimeout(() => {
+        if (document.visibilityState === "visible" && !port) {
+          connectPort();
+        }
+      }, 1000);
     }
   });
 }
@@ -288,4 +290,16 @@ document.addEventListener("visibilitychange", () => {
 
 // Pagehide fires on unload and bfcache
 window.addEventListener("pagehide", cleanupTimer);
+
+// Keep timer resilient on dynamic pages that mutate the DOM heavily.
+setInterval(() => {
+  if (document.visibilityState !== "visible") return;
+  if (!port) {
+    connectPort();
+    return;
+  }
+  if (timerWrapper && !timerWrapper.isConnected) {
+    renderTimer();
+  }
+}, 15000);
 
