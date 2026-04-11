@@ -3,7 +3,7 @@
   "name": "Limitless",
   "short_name": "Limitless",
   "description": "Create website limits, set a schedule, and use Peek Mode to effectively manage distractions.",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "permissions": [
     "storage",
     "tabs",

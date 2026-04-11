@@ -4,7 +4,7 @@
 
 const debugLogs = false;
 
-// --------------
+// Debug command for setting usage manually --------------
 //self.debugSetUsage = function({domain, usage}) {
 //  if (!domain || !usage) {
 //    console.warn("format: debugSetUsage({ domain: \"website.com\", usage: 60 })");
@@ -52,9 +52,34 @@ const orangeColor = "#FFC66B";
 const redColor = "#FF6B6B";
 const grayColor = "#1D1D1D";
 
+async function pingEngagedState() {
+  try {
+    const windowInfo = await chrome.windows.getCurrent({ populate: true }).catch((err) => {
+      if (err.message.includes("No current window")) return null;
+      throw err;
+    });
+    if (!windowInfo) return;
+
+    const activeTab = windowInfo.tabs?.find(tab => tab.active && tab.url && (tab.url.startsWith("http")));
+    if (activeTab?.id == null) return;
+
+    const res = await chrome.tabs.sendMessage(activeTab.id, { type: "pingEngagement" });
+    // Mirror what a tabEngaged message would update:
+    if (res && typeof res.engaged === "boolean") {
+      tabEngaged[activeTab.id] = res.engaged;
+      activeTabTimes[activeTab.id] = Date.now();
+      if (debugLogs) console.log("Pinged engagement");
+    }
+  } catch (err) {
+    if (debugLogs) console.log("Could not ping engagement", err);
+  }
+}
+
 // Initialize on every service worker wake-up
 async function initializeOnWake() {
   try {
+    // ping active tab for a fresh engagedState, prevents using stale prevIsEngaged
+    await pingEngagedState();
     // Run core operations to sync state and reinitialize if needed
     await coreOperations({ forceAll: true });
     
