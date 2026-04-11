@@ -561,6 +561,16 @@ footer {
   span.site-name {
     width: 120px;
   }
+  .day-toggles {
+    height: 30px;
+  }
+  .day-toggles > label {
+    height: 30px;
+  }
+  .day-toggles > label span {
+    width: 44px;
+    height: 30px;
+  }
 }
 @media screen and (max-width: 480px) {
   input[type="text"] {
