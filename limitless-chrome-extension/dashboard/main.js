@@ -227,6 +227,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const usage = Number(site.usage || 0);
       const timeLimit = Number(site.timeLimit || 0);
       const remaining = Math.ceil(Math.max(timeLimit - usage, 0));
+      if (remaining === 0) timeLeftSpan.classList.add("red");
+      
       timeLeftSpan.textContent = `${remaining} min`;
 
       li.append(domainSpan, timeSelect, toggleWrapper, timeLeftSpan, deleteBtn);
@@ -293,6 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (timeSpan) {
         const usage = Number(site.usage || 0);
         const remaining = Math.ceil(Math.max(site.timeLimit - usage, 0));
+        timeSpan.classList.toggle("red", remaining === 0);
         timeSpan.textContent = `${remaining} min`;
       }
       return;
