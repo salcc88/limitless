@@ -217,6 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // delete button
       const deleteBtn = document.createElement("button");
       deleteBtn.textContent = "Delete";
+      deleteBtn.type = "button";
       deleteBtn.classList.add("delete");
       deleteBtn.dataset.domain = site.domain;
       // time left display
